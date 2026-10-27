@@ -6,6 +6,13 @@ module.exports = {
   ],
   theme: {
     extend: {
+      colors: {
+        'brand-primary': {
+          DEFAULT: '#0f172a',
+          hover: '#020617',
+          light: '#1e293b',
+        },
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
