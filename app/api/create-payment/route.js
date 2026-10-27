@@ -44,10 +44,10 @@ export async function POST(request) {
       );
     }
 
-    // 3. Récupération des informations du paiement et du client depuis Supabase (table payments)
+    // 3. Récupération des informations du paiement et du client depuis Supabase (table payments + clients)
     const { data: payment, error: dbError } = await supabaseAdmin
       .from('payments')
-      .select('*')
+      .select('*, client:clients(*)')
       .eq('id', paymentId)
       .single();
 

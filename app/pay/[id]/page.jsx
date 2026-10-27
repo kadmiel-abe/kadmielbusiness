@@ -212,7 +212,7 @@ export default function PaymentPage() {
       try {
         const { data, error: dbError } = await supabase
           .from("payments")
-          .select("*")
+          .select("*, client:clients(*)")
           .eq("id", paymentId)
           .single();
 
@@ -296,7 +296,11 @@ export default function PaymentPage() {
   const amountTotal = payment.amount_total ?? 0;
   const fees = amountTotal - amountNet;
   const customerName =
-    payment.customer_name || payment.client_name || payment.name || "—";
+    payment.client?.name ||
+    payment.customer_name ||
+    payment.client_name ||
+    payment.name ||
+    "—";
   const serviceName = payment.service_name || "Prestation de service";
 
   /* ─── UI principale ─── */
