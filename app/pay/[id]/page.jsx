@@ -313,14 +313,14 @@ export default function PaymentPage() {
           {/* ═══ En-tête avec Logo Officiel Centré ═══ */}
           <div className="px-7 pt-7 pb-4 text-center">
             <div className="flex justify-center mb-3">
-              <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-xs inline-flex items-center justify-center">
+              <div className="h-16 w-16 rounded-2xl overflow-hidden shadow-md border border-slate-900/10 bg-black flex items-center justify-center">
                 <Image
                   src="/logo.png"
                   alt="Kadmiel ABE Logo"
-                  width={140}
-                  height={56}
+                  width={64}
+                  height={64}
                   priority
-                  className="h-14 w-auto object-contain rounded-xl"
+                  className="h-full w-full object-cover"
                 />
               </div>
             </div>

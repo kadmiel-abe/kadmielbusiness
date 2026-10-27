@@ -1,8 +1,13 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Kadmiel ABE — Paiement sécurisé',
+  title: 'Kadmiel Business Pay — Infrastructure de paiement',
   description: 'Page de paiement sécurisé pour les services professionnels de Kadmiel ABE.',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({ children }) {

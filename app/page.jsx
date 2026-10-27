@@ -18,14 +18,16 @@ export default function HomePage() {
       {/* ═══ Header avec logo officiel ═══ */}
       <header className="relative z-10 w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <Image
-            src="/logo.png"
-            alt="Kadmiel ABE Logo"
-            width={44}
-            height={44}
-            priority
-            className="h-10 w-auto object-contain rounded-xl shadow-xs transition-transform duration-200 group-hover:scale-105"
-          />
+          <div className="h-10 w-10 rounded-xl overflow-hidden shadow-xs border border-slate-900/10 bg-black flex items-center justify-center shrink-0">
+            <Image
+              src="/logo.png"
+              alt="Kadmiel ABE Logo"
+              width={40}
+              height={40}
+              priority
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+            />
+          </div>
           <span className="font-bold text-sm tracking-tight text-slate-900">
             Kadmiel ABE
           </span>
@@ -45,14 +47,14 @@ export default function HomePage() {
         <div className="w-full max-w-2xl mx-auto text-center animate-slide-up">
           {/* Logo officiel centré taille professionnelle */}
           <div className="flex justify-center mb-6">
-            <div className="p-2.5 rounded-2xl bg-white/80 backdrop-blur-md border border-slate-200/80 shadow-md">
+            <div className="h-20 w-20 rounded-2xl overflow-hidden shadow-xl border border-slate-900/10 bg-black flex items-center justify-center">
               <Image
                 src="/logo.png"
                 alt="Kadmiel ABE Logo Officiel"
-                width={160}
-                height={64}
+                width={80}
+                height={80}
                 priority
-                className="h-16 w-auto object-contain rounded-xl"
+                className="h-full w-full object-cover"
               />
             </div>
           </div>

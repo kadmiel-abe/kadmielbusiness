@@ -567,14 +567,14 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Logo & Titre */}
           <Link href="/" className="flex items-center gap-3.5 group">
-            <div className="p-1 rounded-xl bg-white border border-slate-200/80 shadow-xs inline-flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl overflow-hidden shadow-xs border border-slate-900/10 bg-black flex items-center justify-center shrink-0">
               <Image
                 src="/logo.png"
                 alt="Kadmiel ABE Logo"
                 width={40}
                 height={40}
                 priority
-                className="h-9 w-auto object-contain rounded-lg transition-transform duration-200 group-hover:scale-105"
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
               />
             </div>
             <div>
@@ -643,14 +643,14 @@ export default function DashboardPage() {
         {/* ═══ En-tête Espace de Travail avec Logo Officiel ═══ */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs shrink-0 flex items-center justify-center">
+            <div className="h-14 w-14 rounded-2xl overflow-hidden shadow-md border border-slate-900/10 bg-black shrink-0 flex items-center justify-center">
               <Image
                 src="/logo.png"
                 alt="Logo Officiel Kadmiel ABE"
                 width={56}
                 height={56}
                 priority
-                className="h-12 w-auto object-contain rounded-xl"
+                className="h-full w-full object-cover"
               />
             </div>
             <div>
