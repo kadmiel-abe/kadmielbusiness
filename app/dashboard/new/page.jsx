@@ -141,7 +141,7 @@ export default function NewPaymentLinkPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 font-sans py-8 sm:py-12 px-4 selection:bg-slate-950 selection:text-white">
+    <div className="text-slate-900 font-sans py-2 selection:bg-slate-950 selection:text-white">
       {/* ═══ Effet d'ambiance vert/sombre inspiré du logo ═══ */}
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center overflow-hidden">
         <div className="h-[420px] w-[420px] rounded-full bg-emerald-100/35 blur-3xl opacity-60" />

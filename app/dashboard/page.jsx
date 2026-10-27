@@ -562,94 +562,76 @@ export default function DashboardPage() {
      ───────────────────────────────────────────────────────────── */
 
   return (
-    <div className="min-h-screen bg-slate-50/70 text-slate-900 font-sans pb-16">
-      {/* ═══ Topbar Navigation ═══ */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 py-3.5 shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Logo & Titre */}
-          <Link href="/" className="flex items-center gap-3.5 group">
-            <div className="h-10 w-10 rounded-xl overflow-hidden shadow-xs border border-slate-900/10 bg-black flex items-center justify-center shrink-0">
-              <Image
-                src="/logo.png"
-                alt="Kadmiel ABE Logo"
-                width={40}
-                height={40}
-                priority
-                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-slate-950 tracking-tight">
-                  Kadmiel ABE
-                </h1>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Analytics 360°
-                </span>
-                {useDemoFallback && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                    <Sparkles className="w-3 h-3 text-amber-500" />
-                    Mode Démo
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">
-                Supervision des encaissements & métriques de conversion
-              </p>
-            </div>
+    <div className="space-y-6 pb-12">
+      {/* ═══ Barre de filtres & actions ═══ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
+              Tableau de bord
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Analytics 360°
+            </span>
+            {useDemoFallback && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                Mode Démo
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Supervision des encaissements & métriques de conversion en temps réel
+          </p>
+        </div>
+
+        {/* Filtres Temporels & Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Menu Filtre Temporel */}
+          <div className="inline-flex p-1 bg-white rounded-xl border border-slate-200 shadow-2xs text-xs font-medium">
+            {[
+              { id: "7d", label: "7 derniers jours" },
+              { id: "month", label: "Ce mois" },
+              { id: "year", label: "Cette année" },
+              { id: "all", label: "Tout" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTimeFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg transition-all duration-150 ${
+                  timeFilter === tab.id
+                    ? "bg-slate-900 text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Bouton Nouveau Lien */}
+          <Link
+            href="/dashboard/new"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 text-white hover:bg-black font-semibold text-xs shadow-xs hover:shadow-md transition-all duration-150 active:scale-[0.98]"
+          >
+            <Plus className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Nouveau lien</span>
           </Link>
 
-          {/* Filtres Temporels & Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            {/* Menu Filtre Temporel */}
-            <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-medium">
-              {[
-                { id: "7d", label: "7 derniers jours" },
-                { id: "month", label: "Ce mois" },
-                { id: "year", label: "Cette année" },
-                { id: "all", label: "Tout" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setTimeFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg transition-all duration-150 ${
-                    timeFilter === tab.id
-                      ? "bg-white text-slate-950 font-bold shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Bouton Nouveau Lien */}
-            <Link
-              href="/dashboard/new"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-white hover:bg-black font-semibold text-xs shadow-xs hover:shadow-md transition-all duration-150 active:scale-[0.98]"
-            >
-              <Plus className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Nouveau lien</span>
-            </Link>
-
-            {/* Bouton Actualiser */}
-            <button
-              onClick={fetchPayments}
-              disabled={refreshing}
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors duration-150 disabled:opacity-50"
-              title="Rafraîchir les données"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${refreshing ? "animate-spin text-slate-950" : ""}`}
-              />
-            </button>
-          </div>
+          {/* Bouton Actualiser */}
+          <button
+            onClick={fetchPayments}
+            disabled={refreshing}
+            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors duration-150 disabled:opacity-50"
+            title="Rafraîchir les données"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${refreshing ? "animate-spin text-slate-950" : ""}`}
+            />
+          </button>
         </div>
-      </header>
-
-      {/* ═══ Contenu Principal ═══ */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+      </div>
         {/* ═══ En-tête Espace de Travail avec Logo Officiel ═══ */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -1190,7 +1172,6 @@ export default function DashboardPage() {
             </table>
           </div>
         </section>
-      </main>
     </div>
   );
 }
