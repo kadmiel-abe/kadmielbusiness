@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Zap, Lock } from 'lucide-react';
 
 export const metadata = {
@@ -14,20 +15,25 @@ export default function HomePage() {
         <div className="h-[480px] w-[480px] rounded-full bg-gradient-to-tr from-slate-200/40 via-indigo-100/30 to-emerald-100/30 blur-3xl opacity-70" />
       </div>
 
-      {/* ═══ Header discret ═══ */}
+      {/* ═══ Header avec logo officiel ═══ */}
       <header className="relative z-10 w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white font-black text-sm tracking-wider shadow-xs">
-            K
-          </div>
+        <Link href="/" className="flex items-center gap-3 group">
+          <Image
+            src="/logo.png"
+            alt="Kadmiel ABE Logo"
+            width={44}
+            height={44}
+            priority
+            className="h-10 w-auto object-contain rounded-xl shadow-xs transition-transform duration-200 group-hover:scale-105"
+          />
           <span className="font-bold text-sm tracking-tight text-slate-900">
             Kadmiel ABE
           </span>
-        </div>
+        </Link>
 
         <Link
           href="/dashboard"
-          className="text-xs font-semibold text-slate-600 hover:text-slate-950 transition-colors flex items-center gap-1"
+          className="text-xs font-semibold text-slate-600 hover:text-slate-950 transition-colors flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white shadow-xs"
         >
           <span>Dashboard</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -35,10 +41,24 @@ export default function HomePage() {
       </header>
 
       {/* ═══ Section Centrale ═══ */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-2xl mx-auto text-center animate-slide-up">
+          {/* Logo officiel centré taille professionnelle */}
+          <div className="flex justify-center mb-6">
+            <div className="p-2.5 rounded-2xl bg-white/80 backdrop-blur-md border border-slate-200/80 shadow-md">
+              <Image
+                src="/logo.png"
+                alt="Kadmiel ABE Logo Officiel"
+                width={160}
+                height={64}
+                priority
+                className="h-16 w-auto object-contain rounded-xl"
+              />
+            </div>
+          </div>
+
           {/* Badge statut */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200/80 shadow-xs mb-8 text-xs font-medium text-slate-700">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200/80 shadow-xs mb-6 text-xs font-medium text-slate-700">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />

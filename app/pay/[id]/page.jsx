@@ -3,6 +3,7 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 /* ──────────────────────────────────────────────
    Helpers
@@ -309,22 +310,26 @@ export default function PaymentPage() {
       <div className="w-full max-w-md animate-slide-up">
         <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-100 overflow-hidden">
 
-          {/* ═══ En-tête ═══ */}
-          <div className="px-7 pt-7 pb-5">
-            <div className="flex items-center gap-3">
-              {/* Logo / icône */}
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white font-bold text-lg select-none">
-                K
-              </div>
-              <div>
-                <h1 className="text-[15px] font-bold text-slate-900 tracking-tight">
-                  Kadmiel ABE
-                </h1>
-                <p className="text-xs text-slate-400 font-medium">
-                  Facture de paiement
-                </p>
+          {/* ═══ En-tête avec Logo Officiel Centré ═══ */}
+          <div className="px-7 pt-7 pb-4 text-center">
+            <div className="flex justify-center mb-3">
+              <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-xs inline-flex items-center justify-center">
+                <Image
+                  src="/logo.png"
+                  alt="Kadmiel ABE Logo"
+                  width={140}
+                  height={56}
+                  priority
+                  className="h-14 w-auto object-contain rounded-xl"
+                />
               </div>
             </div>
+            <h1 className="text-base font-bold text-slate-950 tracking-tight">
+              Kadmiel ABE
+            </h1>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Facture de paiement sécurisé
+            </p>
           </div>
 
           {/* ═══ Détails client & service ═══ */}

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
   TrendingUp,
@@ -564,9 +566,16 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 py-3.5 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Logo & Titre */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white font-black text-lg tracking-wider shadow-sm">
-              K
+          <Link href="/" className="flex items-center gap-3.5 group">
+            <div className="p-1 rounded-xl bg-white border border-slate-200/80 shadow-xs inline-flex items-center justify-center">
+              <Image
+                src="/logo.png"
+                alt="Kadmiel ABE Logo"
+                width={40}
+                height={40}
+                priority
+                className="h-9 w-auto object-contain rounded-lg transition-transform duration-200 group-hover:scale-105"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -588,7 +597,7 @@ export default function DashboardPage() {
                 Supervision des encaissements & métriques de conversion
               </p>
             </div>
-          </div>
+          </Link>
 
           {/* Filtres Temporels & Actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -631,6 +640,40 @@ export default function DashboardPage() {
 
       {/* ═══ Contenu Principal ═══ */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+        {/* ═══ En-tête Espace de Travail avec Logo Officiel ═══ */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs shrink-0 flex items-center justify-center">
+              <Image
+                src="/logo.png"
+                alt="Logo Officiel Kadmiel ABE"
+                width={56}
+                height={56}
+                priority
+                className="h-12 w-auto object-contain rounded-xl"
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-950 tracking-tight">
+                  Espace Kadmiel ABE
+                </h2>
+                <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                  Freelance & Solutions
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tableau de bord financier unifié · Facturation, passerelle GeniusPay & encaissements
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Paiements sécurisés (Wave, Orange, MTN, Carte)</span>
+          </div>
+        </div>
+
         {/* ═══ 1. KPIs : Statistiques Clés ═══ */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* KPI 1 : CA Net Encaissé */}
