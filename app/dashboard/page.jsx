@@ -26,6 +26,7 @@ import {
   Sparkles,
   ChevronRight,
   Filter,
+  Plus,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -622,6 +623,15 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
+
+            {/* Bouton Nouveau Lien */}
+            <Link
+              href="/dashboard/new"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-white hover:bg-black font-semibold text-xs shadow-xs hover:shadow-md transition-all duration-150 active:scale-[0.98]"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Nouveau lien</span>
+            </Link>
 
             {/* Bouton Actualiser */}
             <button

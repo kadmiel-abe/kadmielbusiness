@@ -1,0 +1,95 @@
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/**
+ * Route POST /api/payments/create-link
+ * Crée un client (ou réutilise un existant) et insère le paiement dans Supabase.
+ * Contourne les RLS de manière sécurisée côté serveur.
+ */
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { id, client_name, client_phone, service_name, amount_net, amount_total } = body || {};
+
+    if (!client_name || !client_phone || !service_name || !amount_net || !amount_total) {
+      return NextResponse.json(
+        { error: 'Tous les champs obligatoires doivent être renseignés.' },
+        { status: 400 }
+      );
+    }
+
+    // 1. Recherche ou création du client dans la table `clients`
+    let clientId = null;
+    const cleanPhone = client_phone.trim();
+
+    if (cleanPhone) {
+      const { data: existing } = await supabaseAdmin
+        .from('clients')
+        .select('id')
+        .eq('phone', cleanPhone)
+        .maybeSingle();
+
+      if (existing?.id) {
+        clientId = existing.id;
+      }
+    }
+
+    if (!clientId) {
+      const { data: createdClient, error: clientErr } = await supabaseAdmin
+        .from('clients')
+        .insert({
+          name: client_name.trim(),
+          phone: cleanPhone,
+        })
+        .select('id')
+        .single();
+
+      if (clientErr) {
+        console.error('[CreateLink API] Erreur création client :', clientErr);
+        // Fallback sans bloquer si la création client échoue
+      } else {
+        clientId = createdClient?.id;
+      }
+    }
+
+    // 2. Insertion du paiement dans la table `payments`
+    const paymentId = id || crypto.randomUUID();
+    const { data: payment, error: payErr } = await supabaseAdmin
+      .from('payments')
+      .insert({
+        id: paymentId,
+        client_id: clientId,
+        service_name: service_name.trim(),
+        amount_net: Number(amount_net),
+        amount_total: Number(amount_total),
+        status: 'en_attente',
+      })
+      .select('*, client:clients(*)')
+      .single();
+
+    if (payErr) {
+      console.error('[CreateLink API] Erreur insertion paiement :', payErr);
+      return NextResponse.json(
+        { error: 'Erreur lors de la création du paiement en base de données.', details: payErr.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        payment,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error('[CreateLink API] Exception serveur :', error);
+    return NextResponse.json(
+      { error: 'Erreur serveur interne lors de la création du lien de paiement.' },
+      { status: 500 }
+    );
+  }
+}
