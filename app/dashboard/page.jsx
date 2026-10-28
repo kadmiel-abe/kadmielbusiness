@@ -30,7 +30,7 @@ import {
 const CHART_COLORS = ["#a3e635", "#84cc16", "#4d7c0f", "#d9f99d", "#65a30d"];
 const formatAmount = (value) =>
   `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Number(value) || 0)} FCFA`;
-const clientOf = (tx) => (Array.isArray(tx.client) ? tx.client[0] : tx.client);
+const clientOf = (tx) => (Array.isArray(tx.clients) ? tx.clients[0] : tx.clients);
 const dateOf = (tx) => {
   const date = new Date(tx.created_at);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     try {
       const { data, error } = await supabase
         .from("paiements")
-        .select("*, client:clients(nom, telephone)")
+        .select("*, clients(nom, telephone)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       setTransactions(data ?? []);
