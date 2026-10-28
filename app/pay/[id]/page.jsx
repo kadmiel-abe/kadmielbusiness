@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation"; // <-- L'outil magique de Next.js
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { LoaderCircle, CheckCircle2, ShieldCheck, CreditCard, ArrowRight } from "lucide-react";
 
-export default function PagePaiementClient({ params }) {
+export default function PagePaiementClient() {
+  const params = useParams(); // Extraction sécurisée de l'ID depuis l'URL
   const supabase = createClientComponentClient();
   const [transaction, setTransaction] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [erreur, setErreur] = useState("");
 
   useEffect(() => {
+    // Sécurité : On attend que Next.js ait bien lu l'URL avant de lancer la recherche
+    if (!params?.id) return;
+
     const fetchTransaction = async () => {
       try {
         const { data, error } = await supabase
@@ -24,7 +29,7 @@ export default function PagePaiementClient({ params }) {
 
         setTransaction(data);
       } catch (err) {
-        console.error("Erreur:", err);
+        console.error("Erreur de récupération :", err);
         setErreur("Ce lien de paiement est invalide ou n'existe plus.");
       } finally {
         setIsLoading(false);
@@ -32,7 +37,7 @@ export default function PagePaiementClient({ params }) {
     };
 
     fetchTransaction();
-  }, [params.id, supabase]);
+  }, [params?.id, supabase]);
 
   if (isLoading) {
     return (
@@ -111,7 +116,7 @@ export default function PagePaiementClient({ params }) {
               </div>
             ) : (
               <a
-                href={transaction.geniuspay_url}
+                href={transaction.geniuspay_url || "#"}
                 className="w-full bg-lime-400 hover:bg-lime-500 text-black py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-lg transition-colors"
               >
                 <CreditCard className="w-5 h-5" />
