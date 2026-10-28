@@ -1,1177 +1,630 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
-  TrendingUp,
-  Wallet,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  Zap,
-  Calendar,
-  Search,
-  Copy,
-  Check,
-  ExternalLink,
-  MessageCircle,
-  RefreshCw,
-  Users,
-  CreditCard,
+  ArrowDownRight,
   ArrowUpRight,
-  ShieldCheck,
-  Sparkles,
-  ChevronRight,
-  Filter,
+  Check,
+  Clock3,
+  Copy,
+  ExternalLink,
+  LoaderCircle,
+  MessageCircle,
   Plus,
+  Wallet,
 } from "lucide-react";
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
 } from "recharts";
 
-/* ─────────────────────────────────────────────────────────────
-   HELPERS & FORMATTERS
-   ───────────────────────────────────────────────────────────── */
+const SERVICE_COLORS = ["#22c55e", "#16a34a", "#15803d", "#166534", "#14532d"];
 
-function formatAmount(amount) {
-  if (amount == null || isNaN(amount)) return "0 FCFA";
+const formatAmount = (amount) =>
+  `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Number(amount) || 0)} FCFA`;
+
+const getClient = (transaction) =>
+  Array.isArray(transaction.client) ? transaction.client[0] : transaction.client;
+
+const getTransactionDate = (transaction) => {
+  const date = new Date(transaction.created_at);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+
   return (
-    new Intl.NumberFormat("fr-FR", {
-      maximumFractionDigits: 0,
-    }).format(amount) + " FCFA"
+    <div className="rounded-xl border border-white/10 bg-zinc-950 px-3.5 py-3 shadow-xl">
+      <p className="mb-1 text-xs text-zinc-400">{label}</p>
+      <p className="text-sm font-semibold text-green-400">{formatAmount(payload[0].value)}</p>
+    </div>
   );
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  const date = new Date(dateStr);
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+function LoadingState() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[55vh] flex-col items-center justify-center gap-4 text-zinc-400"
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-green-500/20 bg-green-500/10 text-green-400">
+        <LoaderCircle className="h-6 w-6 animate-spin" />
+      </span>
+      <span className="text-sm">Chargement de vos données financières…</span>
+    </div>
+  );
 }
-
-function formatDuration(diffMs) {
-  if (!diffMs || diffMs <= 0) return "—";
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "< 1 min";
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (hours < 24) {
-    return `${hours}h ${remainingMinutes > 0 ? remainingMinutes + "m" : ""}`;
-  }
-  const days = (diffMs / (24 * 3600000)).toFixed(1);
-  return `${days} jours`;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   DONNÉES DE DÉMONSTRATION (si table Supabase vide)
-   ───────────────────────────────────────────────────────────── */
-
-const DEMO_PAYMENTS = [
-  {
-    id: "f84b2c10-82a1-42ef-9cb4-8172901a1111",
-    service_name: "Refonte Site Vitrine & Branding",
-    amount_total: 650000,
-    amount_net: 625000,
-    status: "paye",
-    payment_method: "wave",
-    created_at: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 34 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c1",
-      name: "Ivoire Fintech Hub",
-      phone: "+2250708091011",
-      email: "contact@ivoirefintech.ci",
-    },
-  },
-  {
-    id: "e73a1b09-71b0-41de-8ba3-7061890b2222",
-    service_name: "Développement Application Web SaaS",
-    amount_total: 1200000,
-    amount_net: 1150000,
-    status: "paye",
-    payment_method: "orange_money",
-    created_at: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 68 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c2",
-      name: "Jean-Marc Koffi",
-      phone: "+2250506070809",
-      email: "jm.koffi@gmail.com",
-    },
-  },
-  {
-    id: "d62f0a98-60af-30cd-7a92-6950789c3333",
-    service_name: "Audit Performance & Sécurité API",
-    amount_total: 450000,
-    amount_net: 430000,
-    status: "paye",
-    payment_method: "wave",
-    created_at: new Date(Date.now() - 120 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 117 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c3",
-      name: "Awa Diop Conseil",
-      phone: "+2250102030405",
-      email: "awa.diop@conseil.sn",
-    },
-  },
-  {
-    id: "c51e9987-59ae-29bc-6981-5849678d4444",
-    service_name: "Maintenance & Hébergement Cloud",
-    amount_total: 280000,
-    amount_net: 270000,
-    status: "en_attente",
-    payment_method: "mtn",
-    created_at: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c4",
-      name: "Bamba & Associés",
-      phone: "+2250789456123",
-      email: "contact@bamba-associes.ci",
-    },
-  },
-  {
-    id: "b40d8876-48ad-18ab-5870-4738567e5555",
-    service_name: "Intégration Passerelle GeniusPay",
-    amount_total: 350000,
-    amount_net: 335000,
-    status: "a_verifier",
-    payment_method: "wave",
-    manual_tx_id: "WAVE-CI-998241",
-    created_at: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c5",
-      name: "Sarah Touré",
-      phone: "+2250544332211",
-      email: "sarah.toure@fashion.ci",
-    },
-  },
-  {
-    id: "a39c7765-37ac-079a-4769-3627456f6666",
-    service_name: "Stratégie Digitale & SEO",
-    amount_total: 500000,
-    amount_net: 480000,
-    status: "paye",
-    payment_method: "carte",
-    created_at: new Date(Date.now() - 180 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 176 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c1",
-      name: "Ivoire Fintech Hub",
-      phone: "+2250708091011",
-      email: "contact@ivoirefintech.ci",
-    },
-  },
-  {
-    id: "928b6654-269b-9689-3658-2516345e7777",
-    service_name: "Atelier Formation Next.js / Tailwind",
-    amount_total: 300000,
-    amount_net: 285000,
-    status: "paye",
-    payment_method: "orange_money",
-    created_at: new Date(Date.now() - 240 * 3600 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 239 * 3600 * 1000).toISOString(),
-    client: {
-      id: "c6",
-      name: "Tech Innovate Abidjan",
-      phone: "+2250147258369",
-      email: "lead@techinnovate.ci",
-    },
-  },
-];
-
-/* ─────────────────────────────────────────────────────────────
-   PALETTES DE COULEURS
-   ───────────────────────────────────────────────────────────── */
-
-const CLIENT_COLORS = ["#0f172a", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
-
-const PAYMENT_METHOD_CONFIG = {
-  wave: { label: "Wave", color: "#1ba4d9", bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
-  orange_money: { label: "Orange Money", color: "#ff6600", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200" },
-  mtn: { label: "MTN Money", color: "#eab308", bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200" },
-  moov: { label: "Moov Money", color: "#0066b3", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
-  carte: { label: "Carte Bancaire", color: "#6366f1", bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
-  geniuspay: { label: "GeniusPay", color: "#0f172a", bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" },
-};
-
-function getMethodBadge(methodKey) {
-  const normalized = (methodKey || "geniuspay").toLowerCase().replace(/[\s-]/g, "_");
-  const config = PAYMENT_METHOD_CONFIG[normalized] || {
-    label: methodKey || "Autre",
-    color: "#64748b",
-    bg: "bg-slate-50",
-    text: "text-slate-600",
-    border: "border-slate-200",
-  };
-  return config;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   COMPOSANTS MODERNE TOOLTIP POUR RECHARTS
-   ───────────────────────────────────────────────────────────── */
-
-function CustomAreaTooltip({ active, payload, label }) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-slate-900 text-white p-3.5 rounded-xl shadow-2xl border border-slate-800 text-xs">
-        <p className="font-semibold text-slate-300 mb-1">{label}</p>
-        <p className="text-base font-extrabold text-emerald-400">
-          {formatAmount(payload[0].value)}
-        </p>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          {payload[0].payload.count} transaction(s) payée(s)
-        </p>
-      </div>
-    );
-  }
-  return null;
-}
-
-function CustomPieTooltip({ active, payload }) {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <div className="bg-slate-900 text-white p-3.5 rounded-xl shadow-2xl border border-slate-800 text-xs">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.payload.fill || data.color }} />
-          <p className="font-semibold text-slate-200">{data.name}</p>
-        </div>
-        <p className="text-sm font-bold text-white">
-          {formatAmount(data.value)}
-        </p>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          {data.payload.percentage ? `${data.payload.percentage}% du total` : `${data.payload.count || 0} transaction(s)`}
-        </p>
-      </div>
-    );
-  }
-  return null;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   PAGE DASHBOARD ANALYTIQUE 360°
-   ───────────────────────────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const supabase = createClientComponentClient();
+  const supabase = useMemo(() => createClientComponentClient(), []);
+  const [transactions, setTransactions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [period, setPeriod] = useState("Ce mois");
+  const [copiedId, setCopiedId] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [kpis, setKpis] = useState({
+    revenue: 0,
+    pending: 0,
+    successRate: 0,
+    averageDelay: 0,
+  });
 
-  const [rawPayments, setRawPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [timeFilter, setTimeFilter] = useState("all"); // '7d' | 'month' | 'year' | 'all'
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [useDemoFallback, setUseDemoFallback] = useState(false);
-  const [copiedId, setCopiedId] = useState(null);
-  const [mounted, setMounted] = useState(false);
+  const loadTransactions = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError("");
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Chargement des données depuis Supabase
-  const fetchPayments = async () => {
     try {
-      setRefreshing(true);
       const { data, error } = await supabase
         .from("payments")
-        .select("*, client:clients(*)")
+        .select("*, client:clients(name, phone)")
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.warn("[Dashboard] Erreur Supabase, fallback activé :", error);
-        setUseDemoFallback(true);
-        setRawPayments(DEMO_PAYMENTS);
-      } else if (!data || data.length === 0) {
-        // Table vide : on utilise la démo par défaut pour une expérience 360° immédiate
-        setUseDemoFallback(true);
-        setRawPayments(DEMO_PAYMENTS);
-      } else {
-        setUseDemoFallback(false);
-        setRawPayments(data);
-      }
-    } catch (err) {
-      console.error("[Dashboard] Exception :", err);
-      setUseDemoFallback(true);
-      setRawPayments(DEMO_PAYMENTS);
+      if (error) throw error;
+
+      setTransactions(data ?? []);
+    } catch (error) {
+      console.error("Erreur lors du chargement des transactions :", error);
+      setLoadError("Impossible de charger les transactions. Vérifiez la connexion à Supabase et vos autorisations.");
+      setTransactions([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
-    fetchPayments();
-  }, []);
+    loadTransactions();
+  }, [loadTransactions]);
 
-  // 1. Filtrage temporel dynamique
-  const filteredByTime = useMemo(() => {
-    if (!rawPayments || rawPayments.length === 0) return [];
-
+  const periodTransactions = useMemo(() => {
     const now = new Date();
-    return rawPayments.filter((p) => {
-      const created = new Date(p.created_at || Date.now());
-      if (timeFilter === "7d") {
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return created >= sevenDaysAgo;
-      }
-      if (timeFilter === "month") {
+    return transactions.filter((transaction) => {
+      const createdAt = getTransactionDate(transaction);
+      if (!createdAt) return false;
+      if (period === "Ce mois") {
         return (
-          created.getMonth() === now.getMonth() &&
-          created.getFullYear() === now.getFullYear()
+          createdAt.getMonth() === now.getMonth() &&
+          createdAt.getFullYear() === now.getFullYear()
         );
       }
-      if (timeFilter === "year") {
-        return created.getFullYear() === now.getFullYear();
-      }
-      return true; // 'all'
+      return createdAt.getFullYear() === now.getFullYear();
     });
-  }, [rawPayments, timeFilter]);
+  }, [period, transactions]);
 
-  // 2. Calcul des KPI clés
-  const stats = useMemo(() => {
-    const totalTransactions = filteredByTime.length;
-    const paidList = filteredByTime.filter((p) => p.status === "paye");
-    const pendingList = filteredByTime.filter(
-      (p) => p.status === "en_attente" || p.status === "a_verifier"
+  useEffect(() => {
+    const paidTransactions = periodTransactions.filter(
+      (transaction) => transaction.status === "paye"
     );
-
-    const totalEncaisseNet = paidList.reduce(
-      (sum, p) => sum + (p.amount_net || p.amount_total || 0),
+    const pendingTransactions = periodTransactions.filter(
+      (transaction) => transaction.status === "en_attente"
+    );
+    const revenue = paidTransactions.reduce(
+      (total, transaction) => total + (Number(transaction.amount_net) || 0),
       0
     );
-    const totalBrut = paidList.reduce(
-      (sum, p) => sum + (p.amount_total || 0),
+    const pending = pendingTransactions.reduce(
+      (total, transaction) => total + (Number(transaction.amount_total) || 0),
       0
     );
-    const totalEnAttente = pendingList.reduce(
-      (sum, p) => sum + (p.amount_total || 0),
-      0
-    );
-
-    const tauxSucces =
-      totalTransactions > 0
-        ? Math.round((paidList.length / totalTransactions) * 100)
-        : 0;
-
-    // Calcul du Délai Moyen de Paiement (différence entre created_at et updated_at pour paye)
-    let totalDelayMs = 0;
-    let validDelayCount = 0;
-
-    paidList.forEach((p) => {
-      if (p.created_at && p.updated_at) {
-        const start = new Date(p.created_at).getTime();
-        const end = new Date(p.updated_at).getTime();
-        const diff = end - start;
-        if (diff > 0) {
-          totalDelayMs += diff;
-          validDelayCount += 1;
+    const successRate = periodTransactions.length
+      ? Math.round((paidTransactions.length / periodTransactions.length) * 100)
+      : 0;
+    const delays = paidTransactions
+      .map((transaction) => {
+        const createdAt = new Date(transaction.created_at).getTime();
+        const updatedAt = new Date(transaction.updated_at).getTime();
+        if (!Number.isFinite(createdAt) || !Number.isFinite(updatedAt) || updatedAt < createdAt) {
+          return null;
         }
-      }
+        return (updatedAt - createdAt) / (24 * 60 * 60 * 1000);
+      })
+      .filter((delay) => delay !== null);
+    const averageDelay = delays.length
+      ? delays.reduce((total, delay) => total + delay, 0) / delays.length
+      : 0;
+
+    setKpis({ revenue, pending, successRate, averageDelay });
+  }, [periodTransactions]);
+
+  const revenueChartData = useMemo(() => {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      return {
+        year: monthDate.getFullYear(),
+        month: monthDate.getMonth(),
+        label: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(monthDate),
+        amount: 0,
+      };
     });
 
-    const avgDelayMs =
-      validDelayCount > 0 ? totalDelayMs / validDelayCount : null;
+    transactions.forEach((transaction) => {
+      if (transaction.status !== "paye") return;
+      const createdAt = getTransactionDate(transaction);
+      if (!createdAt) return;
+      const month = months.find(
+        (item) => item.year === createdAt.getFullYear() && item.month === createdAt.getMonth()
+      );
+      if (month) month.amount += Number(transaction.amount_net) || 0;
+    });
 
-    return {
-      totalEncaisseNet,
-      totalBrut,
-      paidCount: paidList.length,
-      totalEnAttente,
-      pendingCount: pendingList.length,
-      totalTransactions,
-      tauxSucces,
-      avgDelayMs,
-    };
-  }, [filteredByTime]);
+    return months;
+  }, [transactions]);
 
-  // 3. Graphique 1 : Évolution du CA Net sur la période
-  const areaChartData = useMemo(() => {
-    const paidList = filteredByTime
-      .filter((p) => p.status === "paye")
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-    if (paidList.length === 0) return [];
-
-    const grouped = {};
-    paidList.forEach((p) => {
-      const date = new Date(p.created_at);
-      const key = date.toLocaleDateString("fr-FR", {
-        day: "2-digit",
-        month: "short",
+  const serviceChartData = useMemo(() => {
+    const totals = new Map();
+    periodTransactions
+      .filter((transaction) => transaction.status === "paye")
+      .forEach((transaction) => {
+        const name = transaction.service_name?.trim() || "Prestation non renseignée";
+        totals.set(name, (totals.get(name) || 0) + (Number(transaction.amount_net) || 0));
       });
-      if (!grouped[key]) {
-        grouped[key] = { date: key, amount: 0, count: 0 };
-      }
-      grouped[key].amount += p.amount_net || p.amount_total || 0;
-      grouped[key].count += 1;
-    });
 
-    return Object.values(grouped);
-  }, [filteredByTime]);
+    const totalRevenue = Array.from(totals.values()).reduce((sum, amount) => sum + amount, 0);
+    return Array.from(totals, ([name, amount], index) => ({
+      name,
+      amount,
+      percentage: totalRevenue ? Math.round((amount / totalRevenue) * 100) : 0,
+      color: SERVICE_COLORS[index % SERVICE_COLORS.length],
+    })).sort((a, b) => b.amount - a.amount);
+  }, [periodTransactions]);
 
-  // 4. Graphique 2 : Top Clients (Somme encaissée par client)
-  const topClientsData = useMemo(() => {
-    const paidList = filteredByTime.filter((p) => p.status === "paye");
-    const map = {};
-
-    paidList.forEach((p) => {
-      const name =
-        p.client?.name ||
-        p.customer_name ||
-        p.client_name ||
-        p.name ||
-        "Client Inconnu";
-      const amount = p.amount_net || p.amount_total || 0;
-      map[name] = (map[name] || 0) + amount;
-    });
-
-    const total = Object.values(map).reduce((a, b) => a + b, 0);
-
-    const sorted = Object.entries(map)
-      .map(([name, value]) => ({
-        name,
-        value,
-        percentage: total > 0 ? Math.round((value / total) * 100) : 0,
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    // Prendre le top 4 et regrouper le reste sous 'Autres'
-    if (sorted.length > 4) {
-      const top4 = sorted.slice(0, 4);
-      const others = sorted.slice(4);
-      const othersValue = others.reduce((s, c) => s + c.value, 0);
-      top4.push({
-        name: "Autres clients",
-        value: othersValue,
-        percentage: total > 0 ? Math.round((othersValue / total) * 100) : 0,
+  const topClients = useMemo(() => {
+    const totals = new Map();
+    periodTransactions
+      .filter((transaction) => transaction.status === "paye")
+      .forEach((transaction) => {
+        const client = getClient(transaction);
+        const key = client?.name || "Client sans nom";
+        const current = totals.get(key) || { name: key, revenue: 0 };
+        current.revenue += Number(transaction.amount_net) || 0;
+        totals.set(key, current);
       });
-      return top4;
-    }
 
-    return sorted;
-  }, [filteredByTime]);
+    const sortedClients = Array.from(totals.values()).sort(
+      (a, b) => b.revenue - a.revenue
+    );
+    const maxRevenue = sortedClients[0]?.revenue || 0;
 
-  // 5. Graphique 3 : Répartition par méthode de paiement
-  const paymentMethodsData = useMemo(() => {
-    const map = {};
-    filteredByTime.forEach((p) => {
-      const raw = (p.payment_method || "geniuspay").toLowerCase().replace(/[\s-]/g, "_");
-      const config = getMethodBadge(raw);
-      const label = config.label;
-      if (!map[label]) {
-        map[label] = { name: label, value: 0, count: 0, color: config.color };
-      }
-      map[label].value += p.amount_total || 0;
-      map[label].count += 1;
-    });
-
-    const total = Object.values(map).reduce((a, b) => a + b.value, 0);
-
-    return Object.values(map).map((item) => ({
-      ...item,
-      percentage: total > 0 ? Math.round((item.value / total) * 100) : 0,
+    return sortedClients.slice(0, 3).map((client) => ({
+      ...client,
+      initials: client.name
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase(),
+      percentage: maxRevenue ? Math.round((client.revenue / maxRevenue) * 100) : 0,
     }));
-  }, [filteredByTime]);
+  }, [periodTransactions]);
 
-  // 6. Tableau des transactions (avec recherche & filtre statut)
-  const displayedTransactions = useMemo(() => {
-    return filteredByTime.filter((p) => {
-      const clientName =
-        p.client?.name || p.customer_name || p.client_name || p.name || "";
-      const service = p.service_name || "";
-      const id = p.id || "";
-      const matchesSearch =
-        clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        id.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus =
-        statusFilter === "all" || p.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [filteredByTime, searchQuery, statusFilter]);
-
-  // Copier le lien de paiement
-  const copyPaymentLink = (id) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/pay/${id}`;
-    navigator.clipboard.writeText(url);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2500);
+  const copyPaymentLink = async (id) => {
+    setActionError("");
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/pay/${id}`);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId(""), 1800);
+    } catch (error) {
+      console.error("Impossible de copier le lien de paiement :", error);
+      setActionError("La copie du lien a échoué. Vérifiez les autorisations du navigateur.");
+    }
   };
 
-  // Génération du lien de relance WhatsApp
-  const getWhatsAppLink = (p) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const payUrl = `${origin}/pay/${p.id}`;
-    const clientName =
-      p.client?.name || p.customer_name || p.client_name || p.name || "Client";
-    const phone = (
-      p.client?.phone ||
-      p.customer_phone ||
-      p.client_phone ||
-      p.phone ||
-      ""
-    ).replace(/[^0-9]/g, "");
-
-    const service = p.service_name || "prestation professionnelle";
-    const total = formatAmount(p.amount_total);
-
-    let message = "";
-    if (p.status === "paye") {
-      message = `Bonjour ${clientName},\n\nMerci pour votre règlement de ${total} concernant le service "${service}". Votre facture est confirmée avec succès.\n\nBien cordialement,\nKadmiel ABE`;
-    } else if (p.status === "a_verifier") {
-      message = `Bonjour ${clientName},\n\nVotre justificatif de paiement pour "${service}" (${total}) est en cours de vérification par notre équipe.\n\nBien cordialement,\nKadmiel ABE`;
-    } else {
-      message = `Bonjour ${clientName},\n\nKadmiel ABE vous relance concernant le règlement de votre facture pour "${service}" d'un montant de ${total}.\n\nVoici votre lien de paiement direct sécurisé (Wave, Orange Money, MTN, Moov, Carte) :\n👉 ${payUrl}\n\nMerci de votre confiance,\nKadmiel ABE`;
+  const openWhatsApp = (transaction) => {
+    const client = getClient(transaction);
+    if (!client?.phone) {
+      setActionError("Aucun numéro de téléphone n’est enregistré pour ce client.");
+      return;
     }
 
-    let targetPhone = phone;
-    if (phone.length === 10 && !phone.startsWith("225")) {
-      targetPhone = "225" + phone;
-    }
-
-    return `https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`;
+    setActionError("");
+    const text = `Bonjour ${client.name || ""}, voici le lien pour votre règlement : ${window.location.origin}/pay/${transaction.id}`;
+    const url = `https://wa.me/${encodeURIComponent(client.phone.replace(/[^\d]/g, ""))}?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  /* ─────────────────────────────────────────────────────────────
-     RENDU JSX
-     ───────────────────────────────────────────────────────────── */
+  const markAsPaid = async (transaction) => {
+    setActionError("");
+    setUpdatingId(transaction.id);
+
+    try {
+      const { error } = await supabase
+        .from("payments")
+        .update({ status: "paye" })
+        .eq("id", transaction.id);
+
+      if (error) throw error;
+      await loadTransactions();
+    } catch (error) {
+      console.error("Erreur lors de la validation manuelle du paiement :", error);
+      setActionError("Impossible de valider le paiement. Vérifiez vos autorisations Supabase.");
+    } finally {
+      setUpdatingId("");
+    }
+  };
+
+  const kpiCards = [
+    {
+      label: "CA net encaissé",
+      value: formatAmount(kpis.revenue),
+      note: "Montant net des paiements confirmés",
+      icon: Wallet,
+      color: "text-green-400",
+    },
+    {
+      label: "En attente",
+      value: formatAmount(kpis.pending),
+      note: "Montant total des paiements en attente",
+      icon: Clock3,
+      color: "text-amber-400",
+    },
+    {
+      label: "Taux de succès",
+      value: `${kpis.successRate} %`,
+      note: `${periodTransactions.filter((transaction) => transaction.status === "paye").length} paiement(s) confirmé(s)`,
+      icon: Check,
+      color: "text-green-400",
+      progress: kpis.successRate,
+    },
+    {
+      label: "Délai moyen",
+      value: `${kpis.averageDelay.toFixed(1).replace(".", ",")} jours`,
+      note: "Entre création et confirmation du paiement",
+      icon: Clock3,
+      color: "text-zinc-400",
+    },
+  ];
+
+  const visibleTransactions = transactions.slice(0, 10);
+
+  if (isLoading) return <LoadingState />;
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ═══ Barre de filtres & actions ═══ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
+    <div className="space-y-7">
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
-              Tableau de bord
-            </h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Analytics 360°
-            </span>
-            {useDemoFallback && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                Mode Démo
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Supervision des encaissements & métriques de conversion en temps réel
+          <p className="mb-1 text-sm text-zinc-500">
+            {new Intl.DateTimeFormat("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            }).format(new Date())}
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            Vue d&apos;ensemble
+          </h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            Suivez la performance de votre activité en un coup d&apos;œil.
           </p>
         </div>
-
-        {/* Filtres Temporels & Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {/* Menu Filtre Temporel */}
-          <div className="inline-flex p-1 bg-white rounded-xl border border-slate-200 shadow-2xs text-xs font-medium">
-            {[
-              { id: "7d", label: "7 derniers jours" },
-              { id: "month", label: "Ce mois" },
-              { id: "year", label: "Cette année" },
-              { id: "all", label: "Tout" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setTimeFilter(tab.id)}
-                className={`px-3 py-1.5 rounded-lg transition-all duration-150 ${
-                  timeFilter === tab.id
-                    ? "bg-slate-900 text-white font-bold shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Bouton Nouveau Lien */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="sr-only" htmlFor="dashboard-period">Période</label>
+          <select
+            id="dashboard-period"
+            value={period}
+            onChange={(event) => setPeriod(event.target.value)}
+            className="h-11 rounded-lg border border-white/10 bg-zinc-950 px-3.5 text-sm text-zinc-200 outline-none transition focus:border-green-500/60"
+          >
+            <option>Ce mois</option>
+            <option>Année</option>
+          </select>
           <Link
             href="/dashboard/new"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 text-white hover:bg-black font-semibold text-xs shadow-xs hover:shadow-md transition-all duration-150 active:scale-[0.98]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 text-sm font-semibold text-white shadow-lg shadow-green-950/30 transition hover:bg-green-500"
           >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Nouveau lien</span>
+            <Plus className="h-4 w-4" />
+            Nouveau lien de paiement
           </Link>
+        </div>
+      </header>
 
-          {/* Bouton Actualiser */}
+      {loadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-red-300">{loadError}</p>
           <button
-            onClick={fetchPayments}
-            disabled={refreshing}
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors duration-150 disabled:opacity-50"
-            title="Rafraîchir les données"
+            type="button"
+            onClick={loadTransactions}
+            className="shrink-0 rounded-lg border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-200 transition hover:bg-red-500/10"
           >
-            <RefreshCw
-              className={`w-4 h-4 ${refreshing ? "animate-spin text-slate-950" : ""}`}
-            />
+            Réessayer
           </button>
         </div>
-      </div>
-        {/* ═══ En-tête Espace de Travail avec Logo Officiel ═══ */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl overflow-hidden shadow-md border border-slate-900/10 bg-black shrink-0 flex items-center justify-center">
-              <Image
-                src="/logo.png"
-                alt="Logo Officiel Kadmiel ABE"
-                width={56}
-                height={56}
-                priority
-                className="h-full w-full object-cover"
-              />
+      )}
+
+      <section aria-label="Indicateurs clés" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpiCards.map(({ label, value, note, icon: Icon, color, progress }) => (
+          <article key={label} className="rounded-xl border border-white/5 bg-black/50 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-zinc-400">{label}</p>
+              <span className={`rounded-lg bg-white/5 p-2 ${color}`}>
+                <Icon className="h-4 w-4" />
+              </span>
             </div>
+            <p className="mt-4 whitespace-nowrap text-2xl font-semibold tracking-tight text-white">
+              {value}
+            </p>
+            {progress !== undefined && (
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            )}
+            <p className="mt-2 text-xs text-zinc-500">{note}</p>
+          </article>
+        ))}
+      </section>
+
+      <section aria-label="Analyses" className="grid gap-4 xl:grid-cols-3">
+        <article className="rounded-xl border border-white/5 bg-black/50 p-5 xl:col-span-2">
+          <div className="mb-5 flex items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-950 tracking-tight">
-                  Espace Kadmiel ABE
-                </h2>
-                <span className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                  Freelance & Solutions
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tableau de bord financier unifié · Facturation, passerelle GeniusPay & encaissements
-              </p>
+              <h2 className="font-semibold text-white">Revenus encaissés</h2>
+              <p className="mt-1 text-xs text-zinc-500">Six derniers mois — paiements confirmés</p>
             </div>
+            <span className="flex items-center gap-2 text-xs text-zinc-400">
+              <span className="h-2 w-2 rounded-sm bg-green-500" />
+              Revenus nets
+            </span>
           </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Paiements sécurisés (Wave, Orange, MTN, Carte)</span>
-          </div>
-        </div>
-
-        {/* ═══ 1. KPIs : Statistiques Clés ═══ */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1 : CA Net Encaissé */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Total Encaissé (Net)
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                <Wallet className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-950 tracking-tight">
-              {formatAmount(stats.totalEncaisseNet)}
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-              <span>{formatAmount(stats.totalBrut)} brut</span>
-              <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-600">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                {stats.paidCount} payé(s)
-              </span>
-            </div>
-          </div>
-
-          {/* KPI 2 : En Attente */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                En Attente / Vérif.
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
-                <Clock className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-950 tracking-tight">
-              {formatAmount(stats.totalEnAttente)}
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-              <span>{stats.pendingCount} transaction(s) en cours</span>
-              <span className="font-semibold text-amber-600">Relance active</span>
-            </div>
-          </div>
-
-          {/* KPI 3 : Taux de Succès */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Taux de Conversion
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-950 tracking-tight">
-              {stats.tauxSucces}%
-            </div>
-            {/* Barre de progression */}
-            <div className="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(stats.tauxSucces, 100)}%` }}
-              />
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
-              {stats.paidCount} sur {stats.totalTransactions} transactions
-            </div>
-          </div>
-
-          {/* KPI 4 : Délai Moyen de Paiement (NOUVEAU) */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Délai Moyen de Paiement
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
-                <Zap className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-950 tracking-tight">
-              {stats.avgDelayMs ? formatDuration(stats.avgDelayMs) : "2.4 h"}
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-              <span>Entre création et règlement</span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-purple-700">
-                ⚡ Fluide
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ 2. SECTION ANALYTIQUE (3 Graphiques Recharts) ═══ */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-950 tracking-tight flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-slate-950" />
-                Section Analytique 360°
-              </h2>
-              <p className="text-xs text-slate-500">
-                Visualisation détaillée de la performance commerciale
-              </p>
-            </div>
-          </div>
-
-          {/* Graphique 1 : Évolution du CA Net (Pleine Largeur) */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Évolution du Chiffre d&apos;Affaires Net Encaissé
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Total cumulé des transactions réglées avec succès
-                </p>
-              </div>
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 self-start">
-                {formatAmount(stats.totalEncaisseNet)} sur la période
-              </span>
-            </div>
-
-            <div className="h-64 sm:h-72 w-full">
-              {mounted && areaChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={areaChartData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0f172a" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#0f172a" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="date"
-                      stroke="#94a3b8"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={{ stroke: "#e2e8f0" }}
-                    />
-                    <YAxis
-                      stroke="#94a3b8"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip content={<CustomAreaTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="amount"
-                      stroke="#0f172a"
-                      strokeWidth={2.5}
-                      fillOpacity={1}
-                      fill="url(#colorRevenue)"
-                      dot={{ r: 4, fill: "#0f172a", strokeWidth: 2, stroke: "#ffffff" }}
-                      activeDot={{ r: 6, fill: "#0f172a", stroke: "#ffffff", strokeWidth: 2 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                  Aucune transaction payée sur cette période temporelle.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Grille 2 Graphiques Circulaires (Top Clients & Méthodes de Paiement) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Graphique 2 : Top Clients (PieChart Donut) */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-slate-700" />
-                    Top Clients
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Répartition par somme encaissée par client
-                  </p>
-                </div>
-              </div>
-
-              <div className="h-60 w-full flex items-center justify-center">
-                {mounted && topClientsData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={topClientsData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {topClientsData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={CLIENT_COLORS[index % CLIENT_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomPieTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-xs text-slate-400">Aucun client pour l&apos;instant</div>
-                )}
-              </div>
-
-              {/* Légende détaillée Top Clients */}
-              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
-                {topClientsData.map((client, idx) => (
-                  <div
-                    key={client.name}
-                    className="flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor:
-                            CLIENT_COLORS[idx % CLIENT_COLORS.length],
-                        }}
-                      />
-                      <span className="font-semibold text-slate-700 truncate">
-                        {client.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-slate-400">{client.percentage}%</span>
-                      <span className="font-bold text-slate-900">
-                        {formatAmount(client.value)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Graphique 3 : Répartition par Payment Method (PieChart Donut) */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                    <CreditCard className="w-4 h-4 text-slate-700" />
-                    Méthodes de Paiement
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Volume traité par canal (Wave, Orange, MTN, Carte)
-                  </p>
-                </div>
-              </div>
-
-              <div className="h-60 w-full flex items-center justify-center">
-                {mounted && paymentMethodsData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={paymentMethodsData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {paymentMethodsData.map((entry, index) => (
-                          <Cell key={`pm-cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomPieTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-xs text-slate-400">Aucune donnée de paiement</div>
-                )}
-              </div>
-
-              {/* Légende détaillée Méthodes */}
-              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
-                {paymentMethodsData.map((method) => (
-                  <div
-                    key={method.name}
-                    className="flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: method.color }}
-                      />
-                      <span className="font-semibold text-slate-700 truncate">
-                        {method.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-slate-400">{method.percentage}%</span>
-                      <span className="font-bold text-slate-900">
-                        {formatAmount(method.value)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ 3. TABLEAU DES TRANSACTIONS RÉCENTES ═══ */}
-        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          {/* Entête du tableau avec barre de recherche & filtres */}
-          <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-950 tracking-tight">
-                Transactions Récentes
-              </h3>
-              <p className="text-xs text-slate-500">
-                Historique des paiements avec relance client WhatsApp
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2.5 flex-wrap">
-              {/* Barre de recherche */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher client, service..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 w-48 sm:w-60"
+          <div className="relative h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={revenueChartData} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid stroke="#27272a" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 12 }} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#71717a", fontSize: 11 }}
+                  tickFormatter={(value) => `${(value / 1000000).toFixed(value >= 1000000 ? 1 : 0)} M`}
                 />
-              </div>
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: "#ffffff08" }} />
+                <Bar dataKey="amount" fill="#22c55e" radius={[5, 5, 0, 0]} maxBarSize={38} />
+              </BarChart>
+            </ResponsiveContainer>
+            {!revenueChartData.some((month) => month.amount > 0) && (
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-600">
+                Aucune donnée de revenu sur les six derniers mois
+              </p>
+            )}
+          </div>
+        </article>
 
-              {/* Filtre par statut */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 cursor-pointer"
-              >
-                <option value="all">Tous les statuts</option>
-                <option value="paye">Payé</option>
-                <option value="en_attente">En attente</option>
-                <option value="a_verifier">À vérifier</option>
-                <option value="echoue">Échoué</option>
-              </select>
+        <article className="rounded-xl border border-white/5 bg-black/50 p-5">
+          <div>
+            <h2 className="font-semibold text-white">Répartition par prestation</h2>
+            <p className="mt-1 text-xs text-zinc-500">Part des revenus confirmés</p>
+          </div>
+          <div className="relative mx-auto h-52 max-w-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={serviceChartData}
+                  dataKey="amount"
+                  nameKey="name"
+                  innerRadius={58}
+                  outerRadius={82}
+                  paddingAngle={4}
+                  stroke="none"
+                >
+                  {serviceChartData.map((service) => (
+                    <Cell key={service.name} fill={service.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value, name) => [formatAmount(value), name]}
+                  contentStyle={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: 12, color: "#fff" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-semibold text-white">{serviceChartData.length}</span>
+              <span className="text-xs text-zinc-500">prestation(s)</span>
             </div>
           </div>
+          {serviceChartData.length ? (
+            <div className="mt-1 max-h-28 space-y-3 overflow-y-auto">
+              {serviceChartData.map((service) => (
+                <div key={service.name} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="flex min-w-0 items-center gap-2 text-zinc-400">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: service.color }} />
+                    <span className="truncate">{service.name}</span>
+                  </span>
+                  <span className="shrink-0 font-medium text-zinc-200">{service.percentage} %</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-2 text-center text-xs text-zinc-600">Aucune prestation encaissée</p>
+          )}
+        </article>
+      </section>
 
-          {/* Tableau */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/75 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
-                <tr>
-                  <th className="py-3 px-5">Client</th>
-                  <th className="py-3 px-4">Service</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Montant Net / Total</th>
-                  <th className="py-3 px-4">Canal</th>
-                  <th className="py-3 px-4">Statut</th>
-                  <th className="py-3 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {displayedTransactions.length > 0 ? (
-                  displayedTransactions.map((tx) => {
-                    const clientName =
-                      tx.client?.name ||
-                      tx.customer_name ||
-                      tx.client_name ||
-                      tx.name ||
-                      "Client";
-                    const clientPhone =
-                      tx.client?.phone ||
-                      tx.customer_phone ||
-                      tx.client_phone ||
-                      "";
-                    const method = getMethodBadge(tx.payment_method);
+      <section className="grid gap-4 xl:grid-cols-3">
+        <article id="transactions" className="min-w-0 rounded-xl border border-white/5 bg-black/50 xl:col-span-2">
+          <div className="flex items-center justify-between gap-3 px-5 py-5">
+            <div>
+              <h2 className="font-semibold text-white">Dernières transactions</h2>
+              <p className="mt-1 text-xs text-zinc-500">Les 10 paiements les plus récents</p>
+            </div>
+            <Link href="/dashboard#transactions" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300">
+              Tout voir <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          {actionError && (
+            <p role="alert" className="mx-5 mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              {actionError}
+            </p>
+          )}
+          {visibleTransactions.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="border-y border-white/5 bg-white/[0.02] text-[11px] uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Client</th>
+                    <th className="px-4 py-3 font-medium">Prestation</th>
+                    <th className="px-4 py-3 font-medium">Montant net</th>
+                    <th className="px-4 py-3 font-medium">Statut</th>
+                    <th className="px-5 py-3 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {visibleTransactions.map((transaction) => {
+                    const client = getClient(transaction);
+                    const isPaid = transaction.status === "paye";
+                    const clientName = client?.name || "Client sans nom";
+                    const initials = clientName
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((part) => part[0])
+                      .join("")
+                      .toUpperCase();
 
                     return (
-                      <tr
-                        key={tx.id}
-                        className="hover:bg-slate-50/70 transition-colors"
-                      >
-                        {/* Client */}
-                        <td className="py-3.5 px-5">
+                      <tr key={transaction.id} className="transition-colors hover:bg-white/[0.02]">
+                        <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center shrink-0 text-xs border border-slate-200">
-                              {clientName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="truncate max-w-[140px] sm:max-w-[180px]">
-                              <p className="font-bold text-slate-900 truncate">
-                                {clientName}
-                              </p>
-                              <p className="text-[11px] text-slate-400 truncate">
-                                {clientPhone || "Sans téléphone"}
-                              </p>
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-300">
+                              {initials}
+                            </span>
+                            <div>
+                              <p className="whitespace-nowrap text-xs font-medium text-zinc-200">{clientName}</p>
+                              <p className="mt-0.5 text-[10px] text-zinc-600">{transaction.id}</p>
                             </div>
                           </div>
                         </td>
-
-                        {/* Service */}
-                        <td className="py-3.5 px-4 font-medium text-slate-700 max-w-[180px] truncate">
-                          {tx.service_name || "Prestation"}
+                        <td className="px-4 py-3.5 text-xs text-zinc-400">{transaction.service_name || "—"}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-xs font-medium text-white">
+                          {formatAmount(transaction.amount_net)}
                         </td>
-
-                        {/* Date */}
-                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                          {formatDate(tx.created_at)}
-                        </td>
-
-                        {/* Montant Net & Total */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <p className="font-bold text-slate-900">
-                            {formatAmount(tx.amount_net || tx.amount_total)}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            Total : {formatAmount(tx.amount_total)}
-                          </p>
-                        </td>
-
-                        {/* Méthode */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${method.bg} ${method.text} border ${method.border}`}
-                          >
-                            {method.label}
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                            isPaid ? "bg-green-500/10 text-green-400" : transaction.status === "en_attente" ? "bg-amber-500/10 text-amber-300" : "bg-white/5 text-zinc-400"
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${isPaid ? "bg-green-400" : transaction.status === "en_attente" ? "bg-amber-300" : "bg-zinc-500"}`} />
+                            {isPaid ? "Payé" : transaction.status === "en_attente" ? "En attente" : transaction.status || "Inconnu"}
                           </span>
                         </td>
-
-                        {/* Statut Badge */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {tx.status === "paye" && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              Payé
-                            </span>
-                          )}
-                          {tx.status === "en_attente" && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              <Clock className="w-3 h-3 text-amber-600" />
-                              En attente
-                            </span>
-                          )}
-                          {tx.status === "a_verifier" && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                              <AlertCircle className="w-3 h-3 text-purple-600" />
-                              À vérifier
-                            </span>
-                          )}
-                          {tx.status === "echoue" && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <XCircle className="w-3 h-3 text-rose-600" />
-                              Échoué
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Actions (WhatsApp & Copie) */}
-                        <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Bouton Relance WhatsApp */}
-                            <a
-                              href={getWhatsAppLink(tx)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-colors duration-150 font-semibold text-[11px] border border-emerald-200"
-                              title="Relancer le client sur WhatsApp"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">
-                                {tx.status === "paye" ? "Reçu" : "Relance"}
-                              </span>
-                            </a>
-
-                            {/* Bouton Copier le lien */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex justify-end gap-1">
                             <button
-                              onClick={() => copyPaymentLink(tx.id)}
-                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
-                              title="Copier le lien public de paiement"
+                              type="button"
+                              onClick={() => openWhatsApp(transaction)}
+                              aria-label={`Envoyer le lien à ${clientName} sur WhatsApp`}
+                              title="Envoyer sur WhatsApp"
+                              className="rounded-md p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-green-400"
                             >
-                              {copiedId === tx.id ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
+                              <MessageCircle className="h-4 w-4" />
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => copyPaymentLink(transaction.id)}
+                              aria-label={`Copier le lien de paiement pour ${clientName}`}
+                              title={copiedId === transaction.id ? "Lien copié" : "Copier le lien de paiement"}
+                              className="rounded-md p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-white"
+                            >
+                              {copiedId === transaction.id ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                            </button>
+                            {!isPaid && (
+                              <button
+                                type="button"
+                                onClick={() => markAsPaid(transaction)}
+                                disabled={updatingId === transaction.id}
+                                aria-label={`Valider manuellement le paiement de ${clientName}`}
+                                title="Confirmer manuellement"
+                                className="rounded-md p-1.5 text-zinc-500 transition hover:bg-green-500/10 hover:text-green-400 disabled:cursor-wait disabled:opacity-50"
+                              >
+                                {updatingId === transaction.id
+                                  ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  : <Check className="h-4 w-4" />}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
                     );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
-                      Aucune transaction trouvée correspondant aux critères.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="border-t border-white/5 px-5 py-14 text-center">
+              <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-zinc-500">
+                <Wallet className="h-5 w-5" />
+              </span>
+              <p className="text-sm font-medium text-zinc-300">Aucune transaction pour le moment</p>
+              <p className="mt-1 text-xs text-zinc-500">Les paiements créés apparaîtront ici.</p>
+            </div>
+          )}
+        </article>
+
+        <article id="clients" className="rounded-xl border border-white/5 bg-black/50 p-5">
+          <div className="mb-6">
+            <h2 className="font-semibold text-white">Meilleurs clients</h2>
+            <p className="mt-1 text-xs text-zinc-500">Par chiffre d&apos;affaires encaissé</p>
           </div>
-        </section>
+          {topClients.length ? (
+            <>
+              <div className="space-y-6">
+                {topClients.map((client, index) => (
+                  <div key={client.name}>
+                    <div className="mb-2.5 flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-zinc-800 text-xs font-semibold text-zinc-300">
+                        {client.initials || "?"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-zinc-200">{client.name}</p>
+                        <p className="mt-0.5 text-xs text-zinc-500">{formatAmount(client.revenue)}</p>
+                      </div>
+                      <span className="text-xs text-zinc-600">0{index + 1}</span>
+                    </div>
+                    <div className="ml-12 h-1.5 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full rounded-full bg-green-500" style={{ width: `${client.percentage}%`, opacity: 1 - index * 0.2 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Link href="/dashboard#clients" className="mt-7 flex items-center justify-center rounded-lg border border-white/10 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.03]">
+                Voir tous les clients
+              </Link>
+            </>
+          ) : (
+            <p className="py-8 text-center text-xs text-zinc-600">Aucun client avec un paiement encaissé.</p>
+          )}
+        </article>
+      </section>
     </div>
   );
 }
