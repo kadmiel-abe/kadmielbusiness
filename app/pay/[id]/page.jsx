@@ -1,6 +1,5 @@
 "use client";
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -207,29 +206,28 @@ export default function PaymentPage() {
   const [submittingManual, setSubmittingManual] = useState(false);
   const [manualSubmitted, setManualSubmitted] = useState(false);
 
-  /* — Fetch du paiement — */
+  /* — Fetch du paiement via API sécurisée — */
   useEffect(() => {
     async function fetchPayment() {
       try {
-        const { data, error: dbError } = await supabase
-          .from("payments")
-          .select("*, client:clients(*)")
-          .eq("id", paymentId)
-          .single();
+        const res = await fetch(`/api/payments/${paymentId}`);
+        const data = await res.json();
 
-        if (dbError || !data) {
-          setError("Ce lien de paiement est invalide ou a expiré.");
+        if (res.ok && data.success && data.payment) {
+          setPayment(data.payment);
         } else {
-          setPayment(data);
+          setError(data.error || "Ce lien de paiement est invalide ou a expiré.");
         }
-      } catch {
+      } catch (err) {
+        console.error("Erreur chargement paiement :", err);
         setError("Impossible de charger les informations de paiement.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     if (paymentId) fetchPayment();
-  }, [paymentId, supabase]);
+  }, [paymentId]);
 
   /* — Paiement via GeniusPay — */
   const handlePay = async () => {

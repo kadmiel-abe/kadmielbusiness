@@ -14,10 +14,10 @@ export async function POST(request) {
   try {
     // 1. Vérification des clés d'API GeniusPay côté serveur
     const apiKey = process.env.GENIUSPAY_API_KEY;
-    const apiSecret = process.env.GENIUSPAY_API_SECRET;
+    const apiSecret = process.env.GENIUSPAY_SECRET_KEY || process.env.GENIUSPAY_API_SECRET;
 
     if (!apiKey || !apiSecret) {
-      console.error('[Create-Payment] Clés API GeniusPay (GENIUSPAY_API_KEY, GENIUSPAY_API_SECRET) manquantes.');
+      console.error('[Create-Payment] Clés API GeniusPay (GENIUSPAY_API_KEY, GENIUSPAY_SECRET_KEY/GENIUSPAY_API_SECRET) manquantes.');
       return NextResponse.json(
         { error: 'Configuration serveur incomplète : clés GeniusPay manquantes.' },
         { status: 500 }

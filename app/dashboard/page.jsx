@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
   Check,
   Clock3,
@@ -12,6 +11,11 @@ import {
   MessageCircle,
   Plus,
   ReceiptText,
+  RefreshCw,
+  Server,
+  Settings2,
+  ShieldCheck,
+  Users,
   Wallet,
 } from "lucide-react";
 import {
@@ -28,9 +32,38 @@ import {
 } from "recharts";
 
 const CHART_COLORS = ["#a3e635", "#84cc16", "#4d7c0f", "#d9f99d", "#65a30d"];
+
 const formatAmount = (value) =>
   `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Number(value) || 0)} FCFA`;
-const clientOf = (tx) => (Array.isArray(tx.clients) ? tx.clients[0] : tx.clients);
+
+const clientOf = (tx) =>
+  tx.client || (Array.isArray(tx.clients) ? tx.clients[0] : tx.clients) || {};
+
+const clientName = (tx) => {
+  const c = clientOf(tx);
+  return c?.name || c?.nom || tx.client_name || "Client sans nom";
+};
+
+const clientPhone = (tx) => {
+  const c = clientOf(tx);
+  return c?.phone || c?.telephone || tx.client_phone || "";
+};
+
+const txService = (tx) =>
+  tx.service_name || tx.service || "Prestation non renseignée";
+
+const txAmountNet = (tx) =>
+  Number(tx.amount_net ?? tx.montant_net) || 0;
+
+const txAmountTotal = (tx) =>
+  Number(tx.amount_total ?? tx.montant_total) || 0;
+
+const txIsPaid = (tx) =>
+  tx.status === "paye" || tx.statut === "paye";
+
+const txIsPending = (tx) =>
+  tx.status === "en_attente" || tx.statut === "en_attente";
+
 const dateOf = (tx) => {
   const date = new Date(tx.created_at);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -58,7 +91,6 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 export default function DashboardPage() {
-  const supabase = useMemo(() => createClientComponentClient(), []);
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState("Ce mois");
@@ -78,12 +110,14 @@ export default function DashboardPage() {
     if (showLoader) setIsLoading(true);
     setLoadError("");
     try {
-      const { data, error } = await supabase
-        .from("paiements")
-        .select("*, clients(nom, telephone)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setTransactions(data ?? []);
+      const res = await fetch("/api/payments");
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Impossible de charger les données financières.");
+      }
+
+      setTransactions(json.payments ?? []);
     } catch (error) {
       console.error("Erreur lors du chargement des transactions :", error);
       setLoadError("Impossible de charger les données Supabase. Vérifiez la connexion et les autorisations.");
@@ -91,7 +125,7 @@ export default function DashboardPage() {
     } finally {
       if (showLoader) setIsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     loadTransactions();
@@ -109,11 +143,11 @@ export default function DashboardPage() {
   }, [period, transactions]);
 
   useEffect(() => {
-    const paid = periodTransactions.filter((tx) => tx.statut === "paye");
-    const pending = periodTransactions.filter((tx) => tx.statut === "en_attente");
+    const paid = periodTransactions.filter(txIsPaid);
+    const pending = periodTransactions.filter(txIsPending);
     setKpis({
-      revenue: paid.reduce((sum, tx) => sum + (Number(tx.montant_net) || 0), 0),
-      pending: pending.reduce((sum, tx) => sum + (Number(tx.montant_total) || 0), 0),
+      revenue: paid.reduce((sum, tx) => sum + txAmountNet(tx), 0),
+      pending: pending.reduce((sum, tx) => sum + txAmountTotal(tx), 0),
       successRate: periodTransactions.length
         ? Math.round((paid.length / periodTransactions.length) * 100)
         : 0,
@@ -133,19 +167,19 @@ export default function DashboardPage() {
       };
     });
     transactions.forEach((tx) => {
-      if (tx.statut !== "paye") return;
+      if (!txIsPaid(tx)) return;
       const date = dateOf(tx);
       const month = months.find((item) => item.year === date?.getFullYear() && item.month === date?.getMonth());
-      if (month) month.amount += Number(tx.montant_net) || 0;
+      if (month) month.amount += txAmountNet(tx);
     });
     return months;
   }, [transactions]);
 
   const serviceData = useMemo(() => {
     const totals = new Map();
-    periodTransactions.filter((tx) => tx.statut === "paye").forEach((tx) => {
-      const name = tx.service?.trim() || "Prestation non renseignée";
-      totals.set(name, (totals.get(name) || 0) + (Number(tx.montant_net) || 0));
+    periodTransactions.filter(txIsPaid).forEach((tx) => {
+      const name = txService(tx);
+      totals.set(name, (totals.get(name) || 0) + txAmountNet(tx));
     });
     const total = Array.from(totals.values()).reduce((sum, amount) => sum + amount, 0);
     return Array.from(totals, ([name, amount], index) => ({
@@ -158,9 +192,9 @@ export default function DashboardPage() {
 
   const topClients = useMemo(() => {
     const totals = new Map();
-    periodTransactions.filter((tx) => tx.statut === "paye").forEach((tx) => {
-      const name = clientOf(tx)?.nom || "Client sans nom";
-      totals.set(name, (totals.get(name) || 0) + (Number(tx.montant_net) || 0));
+    periodTransactions.filter(txIsPaid).forEach((tx) => {
+      const name = clientName(tx);
+      totals.set(name, (totals.get(name) || 0) + txAmountNet(tx));
     });
     const clients = Array.from(totals, ([name, revenue]) => ({ name, revenue }))
       .sort((a, b) => b.revenue - a.revenue)
@@ -168,7 +202,7 @@ export default function DashboardPage() {
     const max = clients[0]?.revenue || 0;
     return clients.map((client) => ({
       ...client,
-      initials: client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(),
+      initials: client.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?",
       percentage: max ? Math.round((client.revenue / max) * 100) : 0,
     }));
   }, [periodTransactions]);
@@ -190,36 +224,46 @@ export default function DashboardPage() {
   };
 
   const openWhatsApp = (tx) => {
-    const client = clientOf(tx);
-    if (!client?.telephone) {
+    const phone = clientPhone(tx);
+    const name = clientName(tx);
+    if (!phone) {
       setActionError("Aucun numéro de téléphone n’est enregistré pour ce client.");
       return;
     }
     setActionError("");
     const link = `${window.location.origin}/pay/${tx.id}`;
-    const message = `Bonjour ${client.nom || ""}, voici votre lien de paiement sécurisé pour la prestation "${tx.service || "votre prestation"}" : ${link}`;
-    const phone = client.telephone.replace(/[^\d]/g, "");
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    const service = txService(tx);
+    const message = `Bonjour ${name}, voici votre lien de paiement sécurisé pour la prestation "${service}" : ${link}`;
+    const cleanPhone = phone.replace(/[^\d]/g, "");
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   };
 
   const markAsPaid = async (tx) => {
     setActionError("");
     setUpdatingId(tx.id);
     try {
-      const { error } = await supabase
-        .from("paiements")
-        .update({ statut: "paye" })
-        .eq("id", tx.id);
-      if (error) throw error;
-      setTransactions((current) => current.map((item) =>
-        item.id === tx.id
-          ? { ...item, statut: "paye" }
-          : item
-      ));
+      const res = await fetch("/api/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: tx.id, status: "paye" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Impossible de valider le paiement.");
+      }
+      setTransactions((current) =>
+        current.map((item) =>
+          item.id === tx.id
+            ? { ...item, status: "paye", statut: "paye" }
+            : item
+        )
+      );
+      setToast("Paiement validé avec succès");
+      window.setTimeout(() => setToast(""), 2200);
       await loadTransactions(false);
     } catch (error) {
       console.error("Erreur lors de la validation manuelle du paiement :", error);
-      setActionError("Impossible de valider le paiement. Vérifiez vos autorisations Supabase.");
+      setActionError(error.message || "Impossible de valider le paiement. Vérifiez vos autorisations Supabase.");
     } finally {
       setUpdatingId("");
     }
@@ -256,7 +300,7 @@ export default function DashboardPage() {
             <option>Ce mois</option>
             <option>Année</option>
           </select>
-          <Link href="/dashboard/nouveau" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 text-sm font-semibold text-black transition hover:bg-lime-500">
+          <Link href="/dashboard/new" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 text-sm font-semibold text-black transition hover:bg-lime-500">
             <Plus className="h-4 w-4" />Nouveau lien
           </Link>
         </div>
@@ -340,7 +384,7 @@ export default function DashboardPage() {
       <section id="transactions" className="rounded-2xl border border-white/5 bg-zinc-900">
         <div className="flex items-center justify-between gap-3 px-5 py-5">
           <div><h2 className="font-semibold text-white">Customer list</h2><p className="mt-1 text-xs text-zinc-500">Dernières transactions enregistrées</p></div>
-          <Link href="/dashboard#transactions" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-lime-400 hover:text-lime-300">Tout voir <ExternalLink className="h-3.5 w-3.5" /></Link>
+          <a href="#transactions" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-lime-400 hover:text-lime-300">Tout voir <ExternalLink className="h-3.5 w-3.5" /></a>
         </div>
         {visibleTransactions.length ? (
           <div className="overflow-x-auto">
@@ -348,16 +392,21 @@ export default function DashboardPage() {
               <thead className="border-y border-white/5 bg-white/[0.02] text-[11px] uppercase tracking-wider text-zinc-500"><tr><th className="px-5 py-3 font-medium">Client</th><th className="px-4 py-3 font-medium">Service</th><th className="px-4 py-3 font-medium">Montant Total</th><th className="px-4 py-3 font-medium">Statut</th><th className="px-5 py-3 text-right font-medium">Actions</th></tr></thead>
               <tbody className="divide-y divide-white/5">
                 {visibleTransactions.map((tx) => {
-                  const client = clientOf(tx);
-                  const name = client?.nom || "Client sans nom";
-                  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-                  const isPaid = tx.statut === "paye";
+                  const name = clientName(tx);
+                  const phone = clientPhone(tx);
+                  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
+                  const isPaid = txIsPaid(tx);
+                  const isPending = txIsPending(tx);
+                  const service = txService(tx);
+                  const total = txAmountTotal(tx);
+                  const statusLabel = isPaid ? "Payé" : isPending ? "En attente" : (tx.status === "a_verifier" ? "À vérifier" : tx.status || "Inconnu");
+
                   return (
                     <tr key={tx.id} className="transition-colors hover:bg-white/[0.02]">
-                      <td className="px-5 py-3.5"><div className="flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-300">{initials}</span><div><p className="whitespace-nowrap text-xs font-medium text-zinc-200">{name}</p><p className="mt-0.5 text-[10px] text-zinc-500">{client?.telephone || "Téléphone non renseigné"}</p></div></div></td>
-                      <td className="px-4 py-3.5 text-xs text-zinc-400">{tx.service || "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-xs font-medium text-white">{formatAmount(tx.montant_total)}</td>
-                      <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium ${isPaid ? "bg-lime-400/10 text-lime-300" : tx.statut === "en_attente" ? "bg-amber-400/10 text-amber-300" : "bg-white/5 text-zinc-400"}`}><span className={`h-1.5 w-1.5 rounded-full ${isPaid ? "bg-lime-300" : tx.statut === "en_attente" ? "bg-amber-300" : "bg-zinc-500"}`} />{isPaid ? "Payé" : tx.statut === "en_attente" ? "En attente" : tx.statut || "Inconnu"}</span></td>
+                      <td className="px-5 py-3.5"><div className="flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-300">{initials}</span><div><p className="whitespace-nowrap text-xs font-medium text-zinc-200">{name}</p><p className="mt-0.5 text-[10px] text-zinc-500">{phone || "Téléphone non renseigné"}</p></div></div></td>
+                      <td className="px-4 py-3.5 text-xs text-zinc-400">{service}</td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-xs font-medium text-white">{formatAmount(total)}</td>
+                      <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium ${isPaid ? "bg-lime-400/10 text-lime-300" : isPending ? "bg-amber-400/10 text-amber-300" : "bg-white/5 text-zinc-400"}`}><span className={`h-1.5 w-1.5 rounded-full ${isPaid ? "bg-lime-300" : isPending ? "bg-amber-300" : "bg-zinc-500"}`} />{statusLabel}</span></td>
                       <td className="px-5 py-3.5"><div className="flex justify-end gap-1">
                         <button type="button" onClick={() => openWhatsApp(tx)} aria-label={`Envoyer le lien à ${name} sur WhatsApp`} title="Envoyer sur WhatsApp" className="rounded-md p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-lime-400"><MessageCircle className="h-4 w-4" /></button>
                         <button type="button" onClick={() => copyPaymentLink(tx.id)} aria-label={`Copier le lien de paiement pour ${name}`} title={copiedId === tx.id ? "Lien copié" : "Copier le lien"} className="rounded-md p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-white">{copiedId === tx.id ? <Check className="h-4 w-4 text-lime-400" /> : <Copy className="h-4 w-4" />}</button>
@@ -378,7 +427,82 @@ export default function DashboardPage() {
           <div className="grid gap-6 md:grid-cols-3">
             {topClients.map((client, index) => <div key={client.name}><div className="mb-2.5 flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-zinc-800 text-xs font-semibold text-zinc-300">{client.initials || "?"}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-200">{client.name}</p><p className="mt-0.5 text-xs text-zinc-500">{formatAmount(client.revenue)}</p></div><span className="text-xs text-zinc-600">0{index + 1}</span></div><div className="ml-12 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-lime-400" style={{ width: `${client.percentage}%`, opacity: 1 - index * 0.2 }} /></div></div>)}
           </div>
-        ) : <p className="py-8 text-center text-xs text-zinc-600">Aucun client avec un paiement encaissé.</p>}
+        ) : <p className="py-8 text-center text-xs text-zinc-600">Aucun client avec un paiement encaissé pour cette période.</p>}
+      </section>
+
+      {/* ═══ Section Réglages & Diagnostics Système (#settings) ═══ */}
+      <section id="settings" className="rounded-2xl border border-white/5 bg-zinc-900 p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-lime-400" />
+              Réglages & Statut du Système
+            </h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Surveillance en direct des intégrations de paiement et de la base de données.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadTransactions()}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-white/10 bg-white/5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 transition"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Actualiser les données
+          </button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pt-2">
+          {/* Card 1 : Supabase */}
+          <div className="rounded-xl border border-white/5 bg-zinc-950 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
+                <Server className="h-3.5 w-3.5 text-lime-400" />
+                Base Supabase
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-400/10 px-2 py-0.5 text-[10px] font-medium text-lime-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse" />
+                Connecté
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Table active : <code className="text-zinc-400">public.payments</code> ({transactions.length} enregistrements synchronisés)
+            </p>
+          </div>
+
+          {/* Card 2 : Passerelle GeniusPay */}
+          <div className="rounded-xl border border-white/5 bg-zinc-950 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5 text-lime-400" />
+                Passerelle GeniusPay
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-400/10 px-2 py-0.5 text-[10px] font-medium text-lime-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-lime-400" />
+                Opérationnel
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Webhooks HMAC idempotents et transactions sécurisées activés.
+            </p>
+          </div>
+
+          {/* Card 3 : Session Administrateur */}
+          <div className="rounded-xl border border-white/5 bg-zinc-950 p-4 space-y-2 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
+                <Users className="h-3.5 w-3.5 text-lime-400" />
+                Session Administrateur
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                Active
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Accès complet aux modules Dashboard, Facturation et Clients.
+            </p>
+          </div>
+        </div>
       </section>
     </div>
   );
