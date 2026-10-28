@@ -9,6 +9,7 @@ import { Mail, Lock, Eye, EyeClosed, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
+  // 1. États React
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -17,10 +18,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
 
+  // 2. Routeur et Supabase
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // 3D Tilt Logic via useMotionValue & useTransform
+  // 3. Logique 3D & Framer Motion Hooks (Déclarés TOUS au sommet pour respecter les règles de React)
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
@@ -28,6 +30,12 @@ export default function LoginPage() {
   const rotateY = useTransform(mouseX, [-0.5, 0.5], ["-7deg", "7deg"]);
   const spotlightX = useTransform(mouseX, [-0.5, 0.5], ["0%", "100%"]);
   const spotlightY = useTransform(mouseY, [-0.5, 0.5], ["0%", "100%"]);
+
+  const spotlightBackground = useTransform(
+    [spotlightX, spotlightY],
+    ([x, y]) =>
+      `radial-gradient(400px circle at ${x} ${y}, rgba(255, 255, 255, 0.08), transparent 70%)`
+  );
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -42,7 +50,7 @@ export default function LoginPage() {
     mouseY.set(0);
   };
 
-  // Vérification de la session active au montage
+  // 4. Vérification de session existante au montage
   useEffect(() => {
     async function checkExistingSession() {
       try {
@@ -55,7 +63,7 @@ export default function LoginPage() {
           return;
         }
       } catch (err) {
-        console.error("Erreur lors de la vérification de la session :", err);
+        console.error("Erreur lors de la vérification de session :", err);
       } finally {
         setCheckingSession(false);
       }
@@ -64,7 +72,7 @@ export default function LoginPage() {
     checkExistingSession();
   }, [router, supabase]);
 
-  // Traitement du formulaire de connexion
+  // 5. Gestion de la soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -77,21 +85,20 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message || "Identifiants incorrects ou accès non autorisé");
+        setError("Identifiants incorrects");
         setIsLoading(false);
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
-    } catch (err) {
-      console.error("Erreur d'authentification :", err);
-      setError("Une erreur inattendue est survenue");
+    } catch {
+      setError("Identifiants incorrects");
       setIsLoading(false);
     }
   };
 
-  // Écran de chargement ultra-fluide avec thème sombre assorti
+  // 6. Écran de chargement lors de la vérification de session
   if (checkingSession) {
     return (
       <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -123,17 +130,17 @@ export default function LoginPage() {
         }}
       />
 
-      {/* 2. FOND : Grille géométrique subtile */}
+      {/* 2. FOND : Grille géométrique discrète */}
       <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] z-[1]" />
 
-      {/* 3. FOND : Lueurs radiales (Radial Glows avec brand-primary) */}
+      {/* 3. FOND : Lueurs radiales (Radial Glows) */}
       <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-brand-primary/80 blur-[140px] pointer-events-none z-[1]" />
       <div className="absolute bottom-1/4 -right-32 w-[32rem] h-[32rem] rounded-full bg-brand-primary-light/40 blur-[160px] pointer-events-none z-[1]" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-72 bg-gradient-to-b from-brand-primary-light/20 via-brand-primary/10 to-transparent blur-[100px] pointer-events-none z-[1]" />
 
       {/* 4. CONTENEUR AVEC PERSPECTIVE 3D */}
       <div className="relative z-10 w-full max-w-[440px] [perspective:1000px]">
-        {/* CARTE PRINCIPALE : Glassmorphism 3D + Survol Motion */}
+        {/* CARTE PRINCIPALE : Glassmorphism 3D */}
         <motion.div
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
@@ -150,7 +157,7 @@ export default function LoginPage() {
           }}
           className="group relative rounded-3xl p-[1px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9),0_0_50px_rgba(15,23,42,0.4)]"
         >
-          {/* Faisceaux lumineux animés sur les bordures (s'intensifient au survol) */}
+          {/* Faisceaux lumineux animés sur les bordures */}
           <div className="absolute -inset-[1px] rounded-3xl overflow-hidden pointer-events-none">
             <div
               className="absolute -inset-[150%] opacity-35 group-hover:opacity-100 transition-opacity duration-700 animate-[spin_6s_linear_infinite]"
@@ -166,19 +173,12 @@ export default function LoginPage() {
             {/* Lumière dynamique qui suit le curseur (Spotlight) */}
             <motion.div
               className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"
-              style={{
-                background: useTransform(
-                  [spotlightX, spotlightY],
-                  ([x, y]) =>
-                    `radial-gradient(400px circle at ${x} ${y}, rgba(255, 255, 255, 0.08), transparent 70%)`
-                ),
-              }}
+              style={{ background: spotlightBackground }}
             />
 
             {/* En-tête : Logo, Titre & Sous-titre */}
             <div className="flex flex-col items-center text-center mb-8">
               <div className="relative mb-5 group/logo">
-                {/* Lueur d'ambiance sous le logo */}
                 <div className="absolute -inset-2 rounded-2xl bg-gradient-to-tr from-white/10 via-emerald-500/20 to-white/10 blur-md opacity-70 group-hover/logo:opacity-100 transition-opacity duration-300" />
                 <div className="relative h-16 w-16 rounded-2xl overflow-hidden border border-white/15 bg-black/90 p-1 flex items-center justify-center shadow-xl backdrop-blur-md transition-transform duration-300 group-hover/logo:scale-105">
                   <Image
@@ -211,7 +211,6 @@ export default function LoginPage() {
                   Adresse email
                 </label>
                 <div className="relative">
-                  {/* Highlight animé Framer Motion (layoutId) */}
                   {focusedInput === "email" && (
                     <motion.div
                       layoutId="input-focus-highlight"
@@ -261,7 +260,6 @@ export default function LoginPage() {
                   Mot de passe
                 </label>
                 <div className="relative">
-                  {/* Highlight animé Framer Motion (layoutId) */}
                   {focusedInput === "password" && (
                     <motion.div
                       layoutId="input-focus-highlight"
@@ -317,7 +315,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Bouton de soumission large */}
+              {/* Bouton de connexion */}
               <div className="pt-3">
                 <motion.button
                   type="submit"
@@ -343,7 +341,7 @@ export default function LoginPage() {
                 </motion.button>
               </div>
 
-              {/* Message d'erreur rouge élégant sous le bouton */}
+              {/* Message d'erreur élégant sous le bouton */}
               <AnimatePresence>
                 {error && (
                   <motion.div
@@ -352,7 +350,7 @@ export default function LoginPage() {
                     exit={{ opacity: 0, y: -6, scale: 0.96 }}
                     transition={{ duration: 0.2 }}
                     role="alert"
-                    className="rounded-xl bg-red-500/10 border border-red-500/25 p-3 text-xs sm:text-sm text-red-400 flex items-center gap-2.5 shadow-sm"
+                    className="rounded-xl bg-red-500/10 border border-red-500/25 p-3 text-xs sm:text-sm text-red-400 flex items-center justify-center gap-2 shadow-sm"
                   >
                     <div className="h-2 w-2 rounded-full bg-red-400 animate-pulse shrink-0" />
                     <span className="font-medium">{error}</span>
