@@ -78,7 +78,6 @@ export default function DashboardPage() {
     if (showLoader) setIsLoading(true);
     setLoadError("");
     try {
-      // CORRECTION : Appel de la bonne table 'paiements' et jointure sur 'clients' avec les bonnes colonnes
       const { data, error } = await supabase
         .from("paiements")
         .select("*, client:clients(nom, telephone)")
@@ -110,7 +109,6 @@ export default function DashboardPage() {
   }, [period, transactions]);
 
   useEffect(() => {
-    // CORRECTION : Utilisation de 'statut', 'montant_net', 'montant_total'
     const paid = periodTransactions.filter((tx) => tx.statut === "paye");
     const pending = periodTransactions.filter((tx) => tx.statut === "en_attente");
     setKpis({
@@ -146,7 +144,6 @@ export default function DashboardPage() {
   const serviceData = useMemo(() => {
     const totals = new Map();
     periodTransactions.filter((tx) => tx.statut === "paye").forEach((tx) => {
-      // CORRECTION : tx.service au lieu de tx.service_name
       const name = tx.service?.trim() || "Prestation non renseignée";
       totals.set(name, (totals.get(name) || 0) + (Number(tx.montant_net) || 0));
     });
@@ -162,7 +159,6 @@ export default function DashboardPage() {
   const topClients = useMemo(() => {
     const totals = new Map();
     periodTransactions.filter((tx) => tx.statut === "paye").forEach((tx) => {
-      // CORRECTION : client.nom au lieu de client.name
       const name = clientOf(tx)?.nom || "Client sans nom";
       totals.set(name, (totals.get(name) || 0) + (Number(tx.montant_net) || 0));
     });
@@ -195,7 +191,6 @@ export default function DashboardPage() {
 
   const openWhatsApp = (tx) => {
     const client = clientOf(tx);
-    // CORRECTION : client.telephone et client.nom
     if (!client?.telephone) {
       setActionError("Aucun numéro de téléphone n’est enregistré pour ce client.");
       return;
@@ -211,7 +206,6 @@ export default function DashboardPage() {
     setActionError("");
     setUpdatingId(tx.id);
     try {
-      // CORRECTION : Mise à jour de 'statut'
       const { error } = await supabase
         .from("paiements")
         .update({ statut: "paye" })
@@ -262,11 +256,130 @@ export default function DashboardPage() {
             <option>Ce mois</option>
             <option>Année</option>
           </select>
-          {/* CORRECTION : Lien vers /dashboard/nouveau */}
           <Link href="/dashboard/nouveau" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 text-sm font-semibold text-black transition hover:bg-lime-500">
             <Plus className="h-4 w-4" />Nouveau lien
           </Link>
         </div>
       </header>
 
-      {loadError
+      {loadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-red-300">{loadError}</p>
+          <button type="button" onClick={() => loadTransactions()} className="shrink-0 rounded-lg border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-500/10">Réessayer</button>
+        </div>
+      )}
+      {actionError && <div role="alert" className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">{actionError}</div>}
+
+      <section aria-label="Indicateurs clés" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpiCards.map(({ label, value, note, icon: Icon, color, progress }) => (
+          <article key={label} className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-zinc-400">{label}</p>
+              <span className={`rounded-lg bg-white/5 p-2 ${color}`}><Icon className="h-4 w-4" /></span>
+            </div>
+            <p className="mt-4 whitespace-nowrap text-2xl font-semibold tracking-tight text-white">{value}</p>
+            {progress !== undefined && <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-lime-400 transition-all" style={{ width: `${progress}%` }} /></div>}
+            <p className="mt-2 text-xs text-zinc-500">{note}</p>
+          </article>
+        ))}
+      </section>
+
+      <section aria-label="Analyses" className="grid gap-4 xl:grid-cols-2">
+        <article className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+          <div className="mb-5">
+            <h2 className="font-semibold text-white">Sales Overview</h2>
+            <p className="mt-1 text-xs text-zinc-500">Répartition du CA encaissé par prestation</p>
+          </div>
+          <div className="relative mx-auto h-64 max-w-[360px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={serviceData} dataKey="amount" nameKey="name" innerRadius={72} outerRadius={100} paddingAngle={3} stroke="none">
+                  {serviceData.map((item) => <Cell key={item.name} fill={item.color} />)}
+                </Pie>
+                <Tooltip formatter={(value, name) => [formatAmount(value), name]} contentStyle={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: 12, color: "#fff" }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-semibold text-white">{serviceData.length}</span>
+              <span className="text-xs text-zinc-500">services</span>
+            </div>
+          </div>
+          {serviceData.length ? (
+            <div className="space-y-3">
+              {serviceData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="flex min-w-0 items-center gap-2 text-zinc-400"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} /><span className="truncate">{item.name}</span></span>
+                  <span className="shrink-0 text-zinc-200">{item.percentage} %</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-center text-xs text-zinc-600">Aucune prestation encaissée</p>}
+        </article>
+
+        <article className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+          <div className="mb-5">
+            <h2 className="font-semibold text-white">Total Profit</h2>
+            <p className="mt-1 text-xs text-zinc-500">Évolution du revenu net encaissé sur six mois</p>
+          </div>
+          <div className="relative h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueChartData} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                <defs><linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a3e635" stopOpacity={0.35} /><stop offset="95%" stopColor="#a3e635" stopOpacity={0} /></linearGradient></defs>
+                <CartesianGrid stroke="#27272a" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={(value) => `${(value / 1000000).toFixed(value >= 1000000 ? 1 : 0)} M`} />
+                <Tooltip content={<ChartTooltip />} />
+                <Area type="monotone" dataKey="amount" stroke="#a3e635" strokeWidth={2.5} fill="url(#profitFill)" activeDot={{ r: 5, fill: "#a3e635", stroke: "#09090b", strokeWidth: 2 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+            {!revenueChartData.some((month) => month.amount > 0) && <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-600">Aucune donnée de revenu sur les six derniers mois</p>}
+          </div>
+        </article>
+      </section>
+
+      <section id="transactions" className="rounded-2xl border border-white/5 bg-zinc-900">
+        <div className="flex items-center justify-between gap-3 px-5 py-5">
+          <div><h2 className="font-semibold text-white">Customer list</h2><p className="mt-1 text-xs text-zinc-500">Dernières transactions enregistrées</p></div>
+          <Link href="/dashboard#transactions" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-lime-400 hover:text-lime-300">Tout voir <ExternalLink className="h-3.5 w-3.5" /></Link>
+        </div>
+        {visibleTransactions.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead className="border-y border-white/5 bg-white/[0.02] text-[11px] uppercase tracking-wider text-zinc-500"><tr><th className="px-5 py-3 font-medium">Client</th><th className="px-4 py-3 font-medium">Service</th><th className="px-4 py-3 font-medium">Montant Total</th><th className="px-4 py-3 font-medium">Statut</th><th className="px-5 py-3 text-right font-medium">Actions</th></tr></thead>
+              <tbody className="divide-y divide-white/5">
+                {visibleTransactions.map((tx) => {
+                  const client = clientOf(tx);
+                  const name = client?.nom || "Client sans nom";
+                  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+                  const isPaid = tx.statut === "paye";
+                  return (
+                    <tr key={tx.id} className="transition-colors hover:bg-white/[0.02]">
+                      <td className="px-5 py-3.5"><div className="flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-300">{initials}</span><div><p className="whitespace-nowrap text-xs font-medium text-zinc-200">{name}</p><p className="mt-0.5 text-[10px] text-zinc-500">{client?.telephone || "Téléphone non renseigné"}</p></div></div></td>
+                      <td className="px-4 py-3.5 text-xs text-zinc-400">{tx.service || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-xs font-medium text-white">{formatAmount(tx.montant_total)}</td>
+                      <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium ${isPaid ? "bg-lime-400/10 text-lime-300" : tx.statut === "en_attente" ? "bg-amber-400/10 text-amber-300" : "bg-white/5 text-zinc-400"}`}><span className={`h-1.5 w-1.5 rounded-full ${isPaid ? "bg-lime-300" : tx.statut === "en_attente" ? "bg-amber-300" : "bg-zinc-500"}`} />{isPaid ? "Payé" : tx.statut === "en_attente" ? "En attente" : tx.statut || "Inconnu"}</span></td>
+                      <td className="px-5 py-3.5"><div className="flex justify-end gap-1">
+                        <button type="button" onClick={() => openWhatsApp(tx)} aria-label={`Envoyer le lien à ${name} sur WhatsApp`} title="Envoyer sur WhatsApp" className="rounded-md p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-lime-400"><MessageCircle className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => copyPaymentLink(tx.id)} aria-label={`Copier le lien de paiement pour ${name}`} title={copiedId === tx.id ? "Lien copié" : "Copier le lien"} className="rounded-md p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-white">{copiedId === tx.id ? <Check className="h-4 w-4 text-lime-400" /> : <Copy className="h-4 w-4" />}</button>
+                        {!isPaid && <button type="button" onClick={() => markAsPaid(tx)} disabled={updatingId === tx.id} aria-label={`Valider le paiement de ${name}`} title="Valider manuellement" className="rounded-md p-1.5 text-zinc-500 transition hover:bg-lime-400/10 hover:text-lime-400 disabled:cursor-wait disabled:opacity-50">{updatingId === tx.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button>}
+                      </div></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="border-t border-white/5 px-5 py-14 text-center"><span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-zinc-500"><ReceiptText className="h-5 w-5" /></span><p className="text-sm font-medium text-zinc-300">Aucune transaction pour le moment</p><p className="mt-1 text-xs text-zinc-500">Les paiements créés apparaîtront ici.</p></div>}
+      </section>
+
+      <section id="clients" className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+        <div className="mb-6"><h2 className="font-semibold text-white">Meilleurs clients</h2><p className="mt-1 text-xs text-zinc-500">Par chiffre d&apos;affaires encaissé</p></div>
+        {topClients.length ? (
+          <div className="grid gap-6 md:grid-cols-3">
+            {topClients.map((client, index) => <div key={client.name}><div className="mb-2.5 flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-zinc-800 text-xs font-semibold text-zinc-300">{client.initials || "?"}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-200">{client.name}</p><p className="mt-0.5 text-xs text-zinc-500">{formatAmount(client.revenue)}</p></div><span className="text-xs text-zinc-600">0{index + 1}</span></div><div className="ml-12 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-lime-400" style={{ width: `${client.percentage}%`, opacity: 1 - index * 0.2 }} /></div></div>)}
+          </div>
+        ) : <p className="py-8 text-center text-xs text-zinc-600">Aucun client avec un paiement encaissé.</p>}
+      </section>
+    </div>
+  );
+}
