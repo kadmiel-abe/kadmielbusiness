@@ -1,63 +1,258 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-// Initialisation de Supabase avec la clé Service Role (contourne RLS pour le webhook)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
+/**
+ * Valide la signature cryptographique HMAC-SHA256 envoyée par GeniusPay.
+ * Teste la signature directe et la variante horodatée.
+ */
+function verifyGeniusPaySignature(rawBody, signature, secret, timestamp) {
+  if (!signature || !secret || !rawBody) {
+    return false;
+  }
+
+  try {
+    const cleanSignature = signature.trim().toLowerCase();
+
+    // 1. Calcul HMAC standard sur le corps brut
+    const hmacStandard = crypto
+      .createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex')
+      .toLowerCase();
+
+    const signatureBuffer = Buffer.from(cleanSignature, 'utf8');
+    const hmacBuffer = Buffer.from(hmacStandard, 'utf8');
+
+    if (
+      signatureBuffer.length === hmacBuffer.length &&
+      crypto.timingSafeEqual(signatureBuffer, hmacBuffer)
+    ) {
+      return true;
+    }
+
+    // 2. Variante intégrant le timestamp si fourni
+    if (timestamp) {
+      const hmacWithTimestamp = crypto
+        .createHmac('sha256', secret)
+        .update(`${timestamp}.${rawBody}`)
+        .digest('hex')
+        .toLowerCase();
+
+      const hmacTimeBuffer = Buffer.from(hmacWithTimestamp, 'utf8');
+      if (
+        signatureBuffer.length === hmacTimeBuffer.length &&
+        crypto.timingSafeEqual(signatureBuffer, hmacTimeBuffer)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('[Webhook GeniusPay] Erreur vérification HMAC :', error);
+    return false;
+  }
+}
+
+/**
+ * Route POST /api/webhook
+ * Écoute, valide et synchronise les statuts des paiements GeniusPay
+ * avec vérification de signature et respect strict de l'idempotence.
+ */
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const webhookSecret = process.env.GENIUSPAY_WEBHOOK_SECRET;
 
-    // ⚠️ IMPORTANT : À adapter avec l'en-tête de signature officiel de GeniusPay
-    // const signature = request.headers.get("x-geniuspay-signature");
+    // Récupération des en-têtes possibles
+    const signature =
+      request.headers.get('x-webhook-signature') ||
+      request.headers.get('x-geniuspay-signature') ||
+      request.headers.get('x-signature');
 
-    console.log("[Webhook] Notification reçue de GeniusPay :", body);
+    const timestamp =
+      request.headers.get('x-webhook-timestamp') ||
+      request.headers.get('x-timestamp');
 
-    // Extraction des données (format indicatif en attendant la doc officielle GeniusPay)
-    const { payment_id, status, transaction_ref } = body;
+    const rawBody = await request.text();
 
-    if (!payment_id) {
-      return NextResponse.json(
-        { error: "ID de paiement manquant dans le webhook." },
-        { status: 400 }
+    if (!rawBody) {
+      return NextResponse.json({ error: 'Corps de requête vide.' }, { status: 400 });
+    }
+
+    // 1. Vérification de la signature si le secret est configuré
+    if (webhookSecret) {
+      if (!signature) {
+        console.warn('[Webhook] Signature absente alors que GENIUSPAY_WEBHOOK_SECRET est défini.');
+        return NextResponse.json(
+          { error: 'Signature requise non fournie.' },
+          { status: 401 }
+        );
+      }
+
+      const isValid = verifyGeniusPaySignature(rawBody, signature, webhookSecret, timestamp);
+      if (!isValid) {
+        console.warn('[Webhook] Signature HMAC invalide.');
+        return NextResponse.json(
+          { error: 'Signature webhook non valide.' },
+          { status: 401 }
+        );
+      }
+    } else {
+      console.warn(
+        '[Webhook] AVERTISSEMENT : GENIUSPAY_WEBHOOK_SECRET non configuré. Validation de signature ignorée.'
       );
     }
 
-    // Mapping des statuts (à ajuster selon les valeurs renvoyées par GeniusPay)
-    let newStatus = "en_attente";
-    if (status === "SUCCESS" || status === "paid" || status === "paye") {
-      newStatus = "paye";
-    } else if (status === "FAILED" || status === "echoue") {
-      newStatus = "echoue";
+    // 2. Analyse du corps JSON
+    let payload;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Format JSON invalide.' }, { status: 400 });
     }
 
-    // Mise à jour du statut du paiement dans Supabase (Idempotence : on met à jour)
-    const { data, error } = await supabaseAdmin
-      .from("payments")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", payment_id)
-      .select()
-      .single();
+    console.info('[Webhook GeniusPay] Événement reçu :', JSON.stringify(payload, null, 2));
 
-    if (error) {
-      console.error("[Webhook] Erreur mise à jour Supabase :", error);
+    // 3. Extraction flexible du payment_id
+    const metadata = payload.data?.metadata || payload.metadata || {};
+    const paymentId =
+      metadata.payment_id ||
+      metadata.paymentId ||
+      payload.data?.payment_id ||
+      payload.payment_id ||
+      payload.paymentId ||
+      payload.data?.id;
+
+    // Type d'événement ou statut renvoyé
+    const eventType = (
+      payload.event ||
+      payload.type ||
+      request.headers.get('x-webhook-event') ||
+      payload.status ||
+      payload.data?.status ||
+      ''
+    ).toLowerCase();
+
+    // Mode ou moyen de paiement (Wave, Orange, MTN, Moov...)
+    const provider =
+      payload.data?.provider ||
+      payload.provider ||
+      payload.data?.payment_method ||
+      payload.payment_method ||
+      'geniuspay';
+
+    const transactionReference =
+      payload.data?.reference ||
+      payload.reference ||
+      payload.data?.transaction_id ||
+      payload.transaction_id ||
+      null;
+
+    if (!paymentId) {
+      console.warn('[Webhook] Aucun payment_id exploitable dans le payload :', payload);
+      // Acquitter pour éviter que la passerelle ne réessaie indéfiniment
       return NextResponse.json(
-        { error: "Erreur lors de la mise à jour en base de données." },
-        { status: 500 }
+        { received: true, status: 'ignored_missing_payment_id' },
+        { status: 200 }
       );
     }
 
-    return NextResponse.json({ success: true, payment: data }, { status: 200 });
-  } catch (err) {
-    console.error("[Webhook] Erreur serveur :", err);
+    // 4. Détermination du statut cible
+    const isSuccess =
+      eventType === 'payment.success' ||
+      eventType === 'success' ||
+      eventType === 'paid' ||
+      eventType === 'paye';
+
+    const isFailure =
+      eventType === 'payment.failed' ||
+      eventType === 'payment.cancelled' ||
+      eventType === 'failed' ||
+      eventType === 'echoue' ||
+      eventType === 'cancelled' ||
+      eventType === 'annule';
+
+    // 5. Application idempotente dans Supabase
+    if (isSuccess) {
+      // Met à jour vers 'paye' UNIQUEMENT si le paiement n'est pas déjà payé
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('payments')
+        .update({
+          status: 'paye',
+          payment_method: provider,
+          geniuspay_ref: transactionReference || undefined,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', paymentId)
+        .neq('status', 'paye')
+        .select()
+        .single();
+
+      if (updateError) {
+        // Si code PGRST116, la ligne était déjà 'paye' (idempotence)
+        if (updateError.code === 'PGRST116') {
+          console.info(`[Webhook - Idempotence] Le paiement ${paymentId} est déjà réglé.`);
+          return NextResponse.json(
+            { received: true, status: 'already_paid' },
+            { status: 200 }
+          );
+        }
+
+        console.error('[Webhook] Erreur mise à jour paiement payé :', updateError);
+        return NextResponse.json(
+          { error: 'Erreur mise à jour base de données.' },
+          { status: 500 }
+        );
+      }
+
+      console.info(`[Webhook - Succès] Paiement ${paymentId} validé avec succès (${provider}).`);
+      return NextResponse.json(
+        { received: true, status: 'success', payment_id: paymentId },
+        { status: 200 }
+      );
+    }
+
+    if (isFailure) {
+      // Passe en 'echoue' uniquement s'il n'a pas été marqué payé auparavant
+      const { error: updateError } = await supabaseAdmin
+        .from('payments')
+        .update({
+          status: 'echoue',
+          payment_method: provider,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', paymentId)
+        .neq('status', 'paye');
+
+      if (updateError) {
+        console.error('[Webhook] Erreur marquage échec :', updateError);
+        return NextResponse.json(
+          { error: 'Erreur mise à jour base de données.' },
+          { status: 500 }
+        );
+      }
+
+      console.info(`[Webhook - Échec] Paiement ${paymentId} marqué comme échoué.`);
+      return NextResponse.json(
+        { received: true, status: 'failed', payment_id: paymentId },
+        { status: 200 }
+      );
+    }
+
+    // Événement non bloquant ou informatif
+    console.info(`[Webhook] Événement '${eventType}' acquitté.`);
     return NextResponse.json(
-      { error: "Erreur interne du serveur." },
+      { received: true, message: `Événement ${eventType} acquitté.` },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error('[Webhook] Exception serveur inattendue :', err);
+    return NextResponse.json(
+      { error: 'Erreur interne du serveur lors du traitement du webhook.' },
       { status: 500 }
     );
   }
