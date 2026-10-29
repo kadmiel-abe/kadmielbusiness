@@ -1,70 +1,32 @@
-import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-/**
- * GET /api/payments/[id]
- * Récupère les données publiques nécessaires au client pour régler sa prestation.
- * Accessible publiquement pour les liens envoyés aux clients, sans dépendance
- * directe aux autorisations RLS de l'API anonyme.
- */
 export async function GET(request, { params }) {
   try {
-    const { id } = params || {};
+    const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Identifiant de paiement requis.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ID de paiement manquant." }, { status: 400 });
     }
 
     const { data: payment, error } = await supabaseAdmin
-      .from('payments')
-      .select('id, service_name, amount_net, amount_total, status, created_at, client:clients(id, name, phone, email)')
-      .eq('id', id)
-      .maybeSingle();
+      .from("payments")
+      .select("id, client_name, service_name, amount_net, amount_total, status, created_at")
+      .eq("id", id)
+      .single();
 
-    if (error) {
-      console.error('[API Payment ID GET] Erreur Supabase :', error);
-      return NextResponse.json(
-        { error: 'Erreur lors de la recherche du paiement.' },
-        { status: 500 }
-      );
+    if (error || !payment) {
+      return NextResponse.json({ error: "Lien de paiement introuvable ou expiré." }, { status: 404 });
     }
 
-    if (!payment) {
-      return NextResponse.json(
-        { error: 'Ce lien de paiement est invalide ou a expiré.' },
-        { status: 404 }
-      );
-    }
-
-    const client = payment.client || {};
-    const clientName = client.name || 'Client';
-
-    return NextResponse.json({
-      success: true,
-      payment: {
-        id: payment.id,
-        service_name: payment.service_name || 'Prestation',
-        amount_net: Number(payment.amount_net) || 0,
-        amount_total: Number(payment.amount_total) || 0,
-        status: payment.status || 'en_attente',
-        created_at: payment.created_at,
-        client: {
-          name: clientName,
-          phone: client.phone || '',
-        },
-      },
-    });
+    return NextResponse.json({ payment }, { status: 200 });
   } catch (err) {
-    console.error('[API Payment ID GET] Exception non gérée :', err);
-    return NextResponse.json(
-      { error: 'Erreur serveur interne lors du chargement du paiement.' },
-      { status: 500 }
-    );
+    console.error("[API Get Payment] Erreur :", err);
+    return NextResponse.json({ error: "Erreur interne du serveur." }, { status: 500 });
   }
 }
