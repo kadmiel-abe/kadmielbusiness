@@ -7,6 +7,12 @@
    ============================================ */
 
 @layer base {
+  :root {
+    --brand-green: #119134;
+    --brand-green-bright: #16a83d;
+    --brand-green-glow: rgba(17, 145, 52, 0.35);
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -19,9 +25,9 @@
     color: #ffffff;
   }
 
-  /* Sélection de texte vert & noir */
+  /* Sélection de texte vert pur & noir */
   ::selection {
-    background-color: #10b981;
+    background-color: #119134;
     color: #000000;
   }
 }

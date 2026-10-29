@@ -44,7 +44,7 @@ import {
   YAxis,
 } from "recharts";
 
-const CHART_COLORS = ["#10b981", "#059669", "#047857", "#34d399", "#6ee7b7"];
+const CHART_COLORS = ["#119134", "#16a83d", "#0d772a", "#2cd95c", "#08481b"];
 
 const formatAmount = (value) =>
   `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Number(value) || 0)} FCFA`;
@@ -696,7 +696,7 @@ export default function DashboardPage() {
                   formatter={(value, name) => [formatAmount(value), name]}
                   contentStyle={{
                     backgroundColor: "#000000",
-                    border: "1px solid #10b981",
+                    border: "1px solid #119134",
                     borderRadius: 12,
                     color: "#fff",
                   }}
@@ -752,8 +752,8 @@ export default function DashboardPage() {
               >
                 <defs>
                   <linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#119134" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#119134" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -779,12 +779,12 @@ export default function DashboardPage() {
                 <Area
                   type="monotone"
                   dataKey="amount"
-                  stroke="#10b981"
+                  stroke="#119134"
                   strokeWidth={2.5}
                   fill="url(#profitFill)"
                   activeDot={{
                     r: 5,
-                    fill: "#10b981",
+                    fill: "#119134",
                     stroke: "#09090b",
                     strokeWidth: 2,
                   }}
