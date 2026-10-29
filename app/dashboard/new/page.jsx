@@ -148,23 +148,18 @@ export default function NewPaymentLinkPage() {
         }),
       });
 
-      const result = await response.json();
+      const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            result.details ||
-            "Échec de l'enregistrement du paiement."
-        );
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Impossible d'enregistrer le paiement.");
       }
 
-      // Base URL dynamique
-      const baseUrl =
+      // Construction de l'URL absolue du paiement
+      const origin =
         typeof window !== "undefined"
           ? window.location.origin
           : "https://kadmielbusiness.vercel.app";
-
-      const paymentUrl = `${baseUrl}/pay/${paymentId}`;
+      const paymentUrl = `${origin}/pay/${paymentId}`;
 
       setCreatedPayment({
         id: paymentId,
@@ -176,57 +171,58 @@ export default function NewPaymentLinkPage() {
         amount_total: calculations.total,
       });
     } catch (err) {
-      console.error("[New Payment] Erreur :", err);
-      setError(
-        err.message ||
-          "Une erreur est survenue lors de la création du lien. Veuillez réessayer."
-      );
+      console.error("Erreur lors de la création :", err);
+      setError(err.message || "Erreur de connexion.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Copier le lien
-  const handleCopyLink = () => {
+  // Copie dans le presse-papier
+  const handleCopyLink = async () => {
     if (!createdPayment?.url) return;
-    navigator.clipboard.writeText(createdPayment.url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(createdPayment.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Erreur copie :", err);
+    }
   };
 
-  // Partager via WhatsApp
+  // Envoi WhatsApp en 1 clic
   const handleShareWhatsApp = () => {
     if (!createdPayment) return;
-    const cleanPhone = createdPayment.client_phone.replace(/\+/g, "");
-    const message = `Bonjour ${createdPayment.client_name},\n\nVoici le lien sécurisé pour régler la prestation "${createdPayment.service_name}" :\n👉 ${createdPayment.url}\n\nMontant total : ${formatAmount(createdPayment.amount_total)}\nPaiement disponible par Wave, Orange Money, MTN ou Moov.\n\nMerci pour votre confiance !`;
-
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
-      message
-    )}`;
-    window.open(waUrl, "_blank");
+    const cleanPhone = createdPayment.client_phone.replace(/[^\d]/g, "");
+    const message = `Bonjour ${createdPayment.client_name},\n\nVoici votre lien de paiement sécurisé pour la prestation "${createdPayment.service_name}" :\n👉 ${createdPayment.url}\n\nMontant total : ${formatAmount(createdPayment.amount_total)}\nRèglement possible par Wave, Orange Money, MTN MoMo ou Moov Money.\n\nMerci pour votre confiance !`;
+    window.open(
+      `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   return (
-    <div className="text-slate-900 font-sans py-2 selection:bg-slate-950 selection:text-white">
-      {/* Effet d'ambiance vert marque */}
+    <div className="py-4 sm:py-8 flex flex-col items-center justify-center relative">
+      {/* Halo lumineux d'ambiance émeraude */}
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center overflow-hidden">
-        <div className="h-[420px] w-[420px] rounded-full bg-emerald-100/35 blur-3xl opacity-60" />
+        <div className="h-[460px] w-[460px] rounded-full bg-emerald-500/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-xl mx-auto space-y-6">
-        {/* Navigation retour */}
+      <div className="relative z-10 max-w-xl w-full space-y-6">
+        {/* Navigation retour & Statut */}
         <div className="flex items-center justify-between">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-950 transition-colors px-3 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs group"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors px-3 py-1.5 rounded-xl bg-zinc-900 border border-white/10 shadow-sm group hover:border-emerald-500/30"
           >
             <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-150 group-hover:-translate-x-0.5" />
             <span>Retour au Dashboard</span>
           </Link>
 
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-semibold text-slate-500">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] font-semibold text-emerald-400">
               Passerelle GeniusPay Active
             </span>
           </div>
@@ -234,19 +230,19 @@ export default function NewPaymentLinkPage() {
 
         {/* ═══ ÉCRAN 1 : LIEN CRÉÉ AVEC SUCCÈS ═══ */}
         {createdPayment ? (
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden animate-slide-up">
-            <div className="p-6 sm:p-8 text-center space-y-4 border-b border-slate-100">
-              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 mx-auto flex items-center justify-center">
+          <div className="bg-zinc-900/90 backdrop-blur-xl rounded-3xl border border-emerald-500/20 shadow-2xl overflow-hidden animate-slide-up">
+            <div className="p-6 sm:p-8 text-center space-y-4 border-b border-white/5">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/10">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
 
               <div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Lien de paiement prêt !
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs sm:text-sm text-zinc-400 mt-1">
                   Facture générée pour{" "}
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-white">
                     {createdPayment.client_name}
                   </span>{" "}
                   ({createdPayment.service_name})
@@ -254,46 +250,47 @@ export default function NewPaymentLinkPage() {
               </div>
 
               {/* Récapitulatif montant */}
-              <div className="inline-flex items-center gap-3 bg-slate-50 border border-slate-200/80 px-4 py-2 rounded-2xl">
+              <div className="inline-flex items-center gap-4 bg-black/60 border border-white/10 px-5 py-2.5 rounded-2xl">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">
                     Total client
                   </span>
-                  <span className="text-base font-black text-slate-950">
+                  <span className="text-base font-black text-white">
                     {formatAmount(createdPayment.amount_total)}
                   </span>
                 </div>
-                <div className="h-6 w-px bg-slate-200" />
+                <div className="h-6 w-px bg-white/10" />
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">
                     Net pour vous
                   </span>
-                  <span className="text-base font-black text-emerald-600">
+                  <span className="text-base font-black text-emerald-400">
                     {formatAmount(createdPayment.amount_net)}
                   </span>
                 </div>
               </div>
 
               {/* Champ Lien avec bouton copie */}
-              <div className="mt-4 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2 text-left">
+              <div className="mt-4 flex items-center gap-2 bg-zinc-950 border border-white/10 rounded-xl p-2 text-left">
                 <input
                   type="text"
                   readOnly
                   value={createdPayment.url}
-                  className="w-full bg-transparent text-xs font-mono text-slate-700 outline-none px-2"
+                  className="w-full bg-transparent text-xs font-mono text-zinc-300 outline-none px-2"
                 />
                 <button
+                  type="button"
                   onClick={handleCopyLink}
-                  className="shrink-0 h-9 px-3.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-800 transition-colors flex items-center gap-1.5 shadow-2xs"
+                  className="shrink-0 h-9 px-3.5 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-black border border-white/10 text-xs font-bold text-zinc-200 transition-all flex items-center gap-1.5"
                 >
                   {copied ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700">Copié !</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">Copié !</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3.5 h-3.5 text-slate-600" />
+                      <Copy className="w-3.5 h-3.5" />
                       <span>Copier</span>
                     </>
                   )}
@@ -302,6 +299,7 @@ export default function NewPaymentLinkPage() {
 
               {/* Bouton Partager sur WhatsApp */}
               <button
+                type="button"
                 onClick={handleShareWhatsApp}
                 className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
               >
@@ -311,44 +309,46 @@ export default function NewPaymentLinkPage() {
             </div>
 
             {/* Actions secondaires */}
-            <div className="bg-slate-50/70 p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="bg-black/40 p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-3">
               <button
+                type="button"
                 onClick={handleReset}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:text-slate-950 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold text-zinc-300 hover:text-white px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors"
               >
-                <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Créer un autre lien</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => router.push("/dashboard")}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-black px-4 py-2.5 rounded-xl transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 px-4 py-2.5 rounded-xl transition-colors"
               >
-                <LayoutDashboard className="w-3.5 h-3.5" />
+                <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Voir le tableau de bord</span>
               </button>
             </div>
           </div>
         ) : (
           /* ═══ ÉCRAN 2 : FORMULAIRE DE CRÉATION ═══ */
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-200">
-            {/* Header */}
-            <div className="px-6 sm:px-8 pt-8 pb-6 border-b border-slate-100 flex items-start gap-4">
-              <div className="h-13 w-13 rounded-2xl overflow-hidden shadow-xs border border-slate-900/10 bg-black shrink-0 flex items-center justify-center">
+          <div className="bg-zinc-900/90 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden transition-all duration-200">
+            {/* Header avec Logo Kadmiel officiel */}
+            <div className="px-6 sm:px-8 pt-8 pb-6 border-b border-white/5 flex items-start gap-4">
+              <div className="h-12 w-12 rounded-xl overflow-hidden shadow-md border border-emerald-500/30 bg-black shrink-0 flex items-center justify-center">
                 <Image
                   src="/logo.png"
                   alt="Logo Officiel"
-                  width={52}
-                  height={52}
+                  width={48}
+                  height={48}
                   priority
                   className="h-full w-full object-cover"
                 />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Nouveau Lien de Paiement
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs sm:text-sm text-zinc-400 mt-1">
                   Générez une facture sécurisée avec calcul automatique des
                   frais.
                 </p>
@@ -359,21 +359,21 @@ export default function NewPaymentLinkPage() {
             <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
               {/* Alerte Erreur */}
               {error && (
-                <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 flex items-start gap-3 text-xs text-rose-800 animate-slide-up">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 flex items-start gap-3 text-xs text-rose-300 animate-slide-up">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-bold">Erreur de validation</p>
-                    <p className="mt-0.5 text-rose-700">{error}</p>
+                    <p className="mt-0.5 text-rose-300">{error}</p>
                   </div>
                 </div>
               )}
 
               {/* Champ 1 : Nom du client */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-emerald-600" />
+                <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Nom du client</span>
-                  <span className="text-rose-500">*</span>
+                  <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -383,19 +383,19 @@ export default function NewPaymentLinkPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, client_name: e.target.value })
                   }
-                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 font-medium"
+                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium"
                 />
               </div>
 
               {/* Champ 2 : Numéro WhatsApp */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                  <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Numéro WhatsApp (Côte d'Ivoire)</span>
-                    <span className="text-rose-500">*</span>
+                    <span className="text-rose-400">*</span>
                   </label>
-                  <span className="text-[10px] text-slate-400 font-medium">
+                  <span className="text-[10px] text-zinc-400 font-medium">
                     Auto-format +225
                   </span>
                 </div>
@@ -407,16 +407,16 @@ export default function NewPaymentLinkPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, client_phone: e.target.value })
                   }
-                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 font-medium font-mono"
+                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium font-mono"
                 />
               </div>
 
               {/* Champ 3 : Nom de la prestation */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
+                <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Nom de la prestation</span>
-                  <span className="text-rose-500">*</span>
+                  <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -426,19 +426,19 @@ export default function NewPaymentLinkPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, service_name: e.target.value })
                   }
-                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 font-medium"
+                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium"
                 />
               </div>
 
               {/* Champ 4 : Montant Net Souhaité */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Coins className="w-3.5 h-3.5 text-emerald-600" />
+                  <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Montant Net souhaité (ce que vous touchez)</span>
-                    <span className="text-rose-500">*</span>
+                    <span className="text-rose-400">*</span>
                   </label>
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30">
                     Net garanti
                   </span>
                 </div>
@@ -453,16 +453,16 @@ export default function NewPaymentLinkPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, amount_net: e.target.value })
                     }
-                    className="w-full h-12 pl-3.5 pr-16 text-sm sm:text-base rounded-xl border border-slate-200 bg-slate-50/50 text-slate-950 font-bold placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    className="w-full h-12 pl-3.5 pr-16 text-sm sm:text-base rounded-xl border border-white/10 bg-zinc-950 text-white font-bold placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-400 pointer-events-none">
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-zinc-400 pointer-events-none">
                     FCFA
                   </span>
                 </div>
 
                 {/* Raccourcis montants */}
                 <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-                  <span className="text-[10px] text-slate-400 mr-1">
+                  <span className="text-[10px] text-zinc-400 mr-1">
                     Exemples :
                   </span>
                   {[25000, 50000, 100000, 250000, 500000].map((val) => (
@@ -470,7 +470,7 @@ export default function NewPaymentLinkPage() {
                       key={val}
                       type="button"
                       onClick={() => setQuickAmount(val)}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors"
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-white/10 bg-zinc-950 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
                     >
                       {new Intl.NumberFormat("fr-FR").format(val)} F
                     </button>
@@ -479,13 +479,13 @@ export default function NewPaymentLinkPage() {
               </div>
 
               {/* ═══ Calculateur en temps réel ═══ */}
-              <div className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-5 border border-slate-800 shadow-md space-y-3.5">
-                <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+              <div className="rounded-2xl bg-black/60 text-white p-5 border border-emerald-500/20 shadow-md space-y-3.5">
+                <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                       <Sparkles className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">
                       Décomposition Financière
                     </span>
                   </div>
@@ -495,7 +495,7 @@ export default function NewPaymentLinkPage() {
                 </div>
 
                 <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-slate-300">
+                  <div className="flex items-center justify-between text-zinc-300">
                     <span className="flex items-center gap-1.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                       Montant Net (versé sur votre compte)
@@ -505,7 +505,7 @@ export default function NewPaymentLinkPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-slate-300">
+                  <div className="flex items-center justify-between text-zinc-300">
                     <span className="flex items-center gap-1.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
                       Frais client (passerelle GeniusPay)
@@ -515,12 +515,12 @@ export default function NewPaymentLinkPage() {
                     </span>
                   </div>
 
-                  <div className="pt-2.5 border-t border-slate-800 flex items-center justify-between">
+                  <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
                     <div>
-                      <span className="text-xs uppercase font-extrabold tracking-wider text-slate-200">
+                      <span className="text-xs uppercase font-extrabold tracking-wider text-zinc-200">
                         Total à payer par le client
                       </span>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-zinc-400">
                         Montant net garanti à 100% pour vous
                       </p>
                     </div>
@@ -535,27 +535,27 @@ export default function NewPaymentLinkPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full h-13 rounded-2xl bg-slate-950 text-white font-bold text-sm sm:text-[15px] transition-all duration-200 hover:bg-black hover:shadow-xl hover:shadow-emerald-950/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 border border-slate-800 overflow-hidden"
+                className="group relative w-full h-13 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm sm:text-[15px] transition-all duration-200 hover:shadow-xl hover:shadow-emerald-500/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 border border-emerald-500/40 overflow-hidden"
               >
                 {loading ? (
                   <>
-                    <div className="animate-spin h-5 w-5 border-2 border-emerald-400 border-t-transparent rounded-full" />
+                    <div className="animate-spin h-5 w-5 border-2 border-slate-950 border-t-transparent rounded-full" />
                     <span>Création du lien en cours…</span>
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="w-5 h-5 text-emerald-400 transition-transform duration-200 group-hover:scale-110" />
+                    <ShieldCheck className="w-5 h-5 text-slate-950 transition-transform duration-200 group-hover:scale-110" />
                     <span>Générer le lien sécurisé</span>
-                    <ArrowRight className="w-4 h-4 text-slate-400 transition-transform duration-200 group-hover:translate-x-1" />
+                    <ArrowRight className="w-4 h-4 text-slate-950 transition-transform duration-200 group-hover:translate-x-1" />
                   </>
                 )}
               </button>
             </form>
 
             {/* Footer */}
-            <div className="bg-slate-50/70 border-t border-slate-100 px-6 sm:px-8 py-3.5 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="bg-black/60 border-t border-white/5 px-6 sm:px-8 py-3.5 flex items-center justify-between text-[11px] text-zinc-400">
               <span className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
                 Génération instantanée
               </span>
               <span>Wave · Orange · MTN · Moov</span>
@@ -563,7 +563,7 @@ export default function NewPaymentLinkPage() {
           </div>
         )}
 
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-zinc-500">
           Kadmiel Business Pay · Infrastructure de facturation sécurisée
         </p>
       </div>
