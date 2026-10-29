@@ -93,6 +93,20 @@ export async function POST(request) {
         );
       }
 
+      // Protection Replay Attack (5 minutes = 300 secondes) selon la doc officielle
+      if (timestamp) {
+        const now = Math.floor(Date.now() / 1000);
+        const parsedTimestamp = parseInt(timestamp, 10);
+        const eventTime = parsedTimestamp > 1e11 ? Math.floor(parsedTimestamp / 1000) : parsedTimestamp;
+        if (!isNaN(eventTime) && Math.abs(now - eventTime) > 300) {
+          console.warn('[Webhook] Timestamp trop ancien :', { now, eventTime });
+          return NextResponse.json(
+            { error: 'Horodatage invalide ou requête expirée.' },
+            { status: 400 }
+          );
+        }
+      }
+
       const isValid = verifyGeniusPaySignature(rawBody, signature, webhookSecret, timestamp);
       if (!isValid) {
         console.warn('[Webhook] Signature HMAC invalide.');

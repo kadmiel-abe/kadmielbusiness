@@ -90,14 +90,23 @@ export async function POST(request) {
       payment.phone ||
       '';
 
-    // 5. Construction du payload conforme aux exigences GeniusPay
+    // Déterminer l'origine pour les redirections post-paiement
+    const origin =
+      request.nextUrl?.origin ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      'https://kadmielbusiness.vercel.app';
+
+    // 5. Construction du payload conforme à la documentation officielle GeniusPay
     const geniusPayPayload = {
       amount: payment.amount_total,
-      description: payment.service_name || 'Paiement de service',
+      description: payment.service_name || 'Paiement de prestation',
       customer: {
         name: customerName,
         phone: customerPhone,
+        country: 'CI',
       },
+      success_url: `${origin}/pay/${paymentId}`,
+      error_url: `${origin}/pay/${paymentId}`,
       metadata: {
         payment_id: paymentId,
       },
