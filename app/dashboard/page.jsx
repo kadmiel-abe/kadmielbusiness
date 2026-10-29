@@ -413,15 +413,15 @@ export default function DashboardPage() {
       note: "Montant net disponible",
       icon: Wallet,
       color: "text-emerald-400",
-      bg: "bg-emerald-500/10",
+      bg: "bg-emerald-500/15 border border-emerald-500/30",
     },
     {
       label: "En attente",
       value: formatAmount(kpis.pending),
       note: "Factures ouvertes non payées",
       icon: Clock3,
-      color: "text-amber-400",
-      bg: "bg-amber-500/10",
+      color: "text-zinc-300",
+      bg: "bg-black border border-zinc-800",
     },
     {
       label: "À vérifier (Secours)",
@@ -431,8 +431,8 @@ export default function DashboardPage() {
           ? `${formatAmount(kpis.toVerifyAmount)} à valider`
           : "Aucune référence SMS en attente",
       icon: ShieldAlert,
-      color: kpis.toVerifyCount > 0 ? "text-amber-400" : "text-zinc-400",
-      bg: kpis.toVerifyCount > 0 ? "bg-amber-500/20 animate-pulse" : "bg-white/5",
+      color: kpis.toVerifyCount > 0 ? "text-emerald-400" : "text-zinc-500",
+      bg: kpis.toVerifyCount > 0 ? "bg-emerald-500/20 border border-emerald-500/40 animate-pulse" : "bg-black border border-zinc-800",
       badge: kpis.toVerifyCount > 0 ? "Action requise" : null,
     },
     {
@@ -441,7 +441,7 @@ export default function DashboardPage() {
       note: `${kpis.totalTransactions} liens générés`,
       icon: Check,
       color: "text-emerald-400",
-      bg: "bg-emerald-500/10",
+      bg: "bg-emerald-500/15 border border-emerald-500/30",
       progress: kpis.successRate,
     },
   ];
@@ -488,7 +488,7 @@ export default function DashboardPage() {
             id="dashboard-period"
             value={period}
             onChange={(event) => setPeriod(event.target.value)}
-            className="h-11 rounded-xl border border-white/10 bg-zinc-900 px-3.5 text-sm text-zinc-200 outline-none transition focus:border-emerald-500"
+            className="h-11 rounded-xl border border-emerald-500/30 bg-black px-3.5 text-sm text-zinc-200 outline-none transition focus:border-emerald-400 font-semibold"
           >
             <option>Ce mois</option>
             <option>Année</option>
@@ -498,7 +498,7 @@ export default function DashboardPage() {
             type="button"
             onClick={() => exportTransactionsToCSV(filteredTransactions, "kadmiel-business-transactions")}
             title="Exporter les transactions filtrées au format CSV pour Excel"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-zinc-900 hover:bg-zinc-800 px-4 text-sm font-semibold text-zinc-200 transition"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-zinc-950 hover:bg-emerald-500/10 hover:border-emerald-400 px-4 text-sm font-semibold text-emerald-400 transition"
           >
             <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
             <span>Exporter CSV ({filteredTransactions.length})</span>
@@ -506,7 +506,7 @@ export default function DashboardPage() {
 
           <Link
             href="/dashboard/new"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-bold text-slate-950 transition shadow-lg shadow-emerald-500/20"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400"
           >
             <Plus className="h-4 w-4" />
             Nouveau lien
@@ -549,7 +549,7 @@ export default function DashboardPage() {
           ({ label, value, note, icon: Icon, color, bg, progress, badge }) => (
             <article
               key={label}
-              className="rounded-2xl border border-white/5 bg-zinc-900 p-5 relative overflow-hidden"
+              className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 relative overflow-hidden hover:border-emerald-500/40 transition-colors shadow-lg"
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-medium text-zinc-400">{label}</p>
@@ -563,14 +563,14 @@ export default function DashboardPage() {
                   {value}
                 </p>
                 {badge && (
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                     {badge}
                   </span>
                 )}
               </div>
 
               {progress !== undefined && (
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
                   <div
                     className="h-full rounded-full bg-emerald-500 transition-all"
                     style={{ width: `${progress}%` }}
@@ -585,7 +585,7 @@ export default function DashboardPage() {
 
       {/* ═══ Graphiques et Répartitions ═══ */}
       <section aria-label="Analyses" className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 shadow-lg">
           <div className="mb-5">
             <h2 className="font-semibold text-white">Répartition des Services</h2>
             <p className="mt-1 text-xs text-zinc-500">
@@ -611,8 +611,8 @@ export default function DashboardPage() {
                 <Tooltip
                   formatter={(value, name) => [formatAmount(value), name]}
                   contentStyle={{
-                    backgroundColor: "#09090b",
-                    border: "1px solid #27272a",
+                    backgroundColor: "#000000",
+                    border: "1px solid #10b981",
                     borderRadius: 12,
                     color: "#fff",
                   }}
@@ -653,7 +653,7 @@ export default function DashboardPage() {
           )}
         </article>
 
-        <article className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 shadow-lg">
           <div className="mb-5">
             <h2 className="font-semibold text-white">Évolution des Revenus</h2>
             <p className="mt-1 text-xs text-zinc-500">
@@ -719,16 +719,17 @@ export default function DashboardPage() {
       {/* ═══ TABLEAU PRINCIPAL DES TRANSACTIONS (#transactions) ═══ */}
       <section
         id="transactions"
-        className="rounded-2xl border border-white/5 bg-zinc-900 overflow-hidden shadow-xl"
+        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] overflow-hidden shadow-2xl"
       >
         {/* Barre d'outils du tableau : Titre + Recherche + Filtres */}
-        <div className="p-5 border-b border-white/5 space-y-4">
+        <div className="p-5 border-b border-emerald-500/15 space-y-4 bg-black/40">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="font-bold text-white text-base">
+              <h2 className="font-bold text-white text-base flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 Transactions & Factures
               </h2>
-              <p className="mt-0.5 text-xs text-zinc-500">
+              <p className="mt-0.5 text-xs text-zinc-400">
                 {filteredTransactions.length} transaction
                 {filteredTransactions.length > 1 ? "s" : ""} trouvée
                 {filteredTransactions.length > 1 ? "s" : ""}
@@ -737,13 +738,13 @@ export default function DashboardPage() {
 
             {/* Barre de Recherche Instantanée */}
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
               <input
                 type="text"
                 placeholder="Rechercher client, service, ID SMS..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-8 text-xs rounded-xl bg-zinc-950 border border-white/10 text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
+                className="w-full h-9 pl-9 pr-8 text-xs rounded-xl bg-black border border-emerald-500/30 text-white placeholder:text-zinc-500 outline-none focus:border-emerald-400 transition"
               />
               {searchQuery && (
                 <button
@@ -759,8 +760,8 @@ export default function DashboardPage() {
 
           {/* Onglets de Filtres de Statut */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-            <span className="text-[11px] text-zinc-500 flex items-center gap-1 mr-1 shrink-0">
-              <Filter className="h-3 w-3" />
+            <span className="text-[11px] text-zinc-400 flex items-center gap-1 mr-1 shrink-0">
+              <Filter className="h-3 w-3 text-emerald-400" />
               Statut :
             </span>
 
@@ -796,20 +797,20 @@ export default function DashboardPage() {
                   key={id}
                   type="button"
                   onClick={() => setStatusFilter(id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition shrink-0 ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition shrink-0 ${
                     active
-                      ? "bg-emerald-500 text-slate-950 font-bold"
+                      ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
                       : highlight && count > 0
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30"
-                      : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700/80"
+                      ? "bg-emerald-950/60 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-900/60"
+                      : "bg-black text-zinc-400 hover:text-white hover:bg-zinc-900 border border-zinc-800"
                   }`}
                 >
                   <span>{label}</span>
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                       active
-                        ? "bg-black/20 text-slate-950"
-                        : "bg-black/40 text-zinc-400"
+                        ? "bg-black/25 text-black font-extrabold"
+                        : "bg-zinc-800 text-zinc-300"
                     }`}
                   >
                     {count}
@@ -1035,7 +1036,7 @@ export default function DashboardPage() {
       {/* ═══ Meilleurs clients (#clients) ═══ */}
       <section
         id="clients"
-        className="rounded-2xl border border-white/5 bg-zinc-900 p-5"
+        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 shadow-lg"
       >
         <div className="mb-6">
           <h2 className="font-semibold text-white">Meilleurs Clients</h2>
@@ -1048,22 +1049,22 @@ export default function DashboardPage() {
             {topClients.map((client, index) => (
               <div key={client.name}>
                 <div className="mb-2.5 flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-zinc-800 text-xs font-semibold text-zinc-300">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-black text-xs font-bold text-emerald-400">
                     {client.initials || "?"}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-zinc-200">
                       {client.name}
                     </p>
-                    <p className="mt-0.5 text-xs text-zinc-500 font-semibold">
+                    <p className="mt-0.5 text-xs text-emerald-400 font-bold">
                       {formatAmount(client.revenue)}
                     </p>
                   </div>
-                  <span className="text-xs text-zinc-600 font-mono">
+                  <span className="text-xs text-zinc-500 font-mono">
                     0{index + 1}
                   </span>
                 </div>
-                <div className="ml-12 h-1.5 overflow-hidden rounded-full bg-white/5">
+                <div className="ml-12 h-1.5 overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
                   <div
                     className="h-full rounded-full bg-emerald-500"
                     style={{
@@ -1085,7 +1086,7 @@ export default function DashboardPage() {
       {/* ═══ Réglages & Surveillance Système (#settings) ═══ */}
       <section
         id="settings"
-        className="rounded-2xl border border-white/5 bg-zinc-900 p-6 space-y-5"
+        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-6 space-y-5 shadow-lg"
       >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -1101,7 +1102,7 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => loadTransactions()}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 transition"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-black text-xs font-semibold text-emerald-400 hover:text-black hover:bg-emerald-500 transition"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Actualiser les données
@@ -1110,31 +1111,31 @@ export default function DashboardPage() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pt-2">
           {/* Card 1 : Supabase */}
-          <div className="rounded-xl border border-white/5 bg-zinc-950 p-4 space-y-2">
+          <div className="rounded-xl border border-emerald-500/20 bg-black p-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
                 <Server className="h-3.5 w-3.5 text-emerald-400" />
                 Base Supabase
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Connecté
               </span>
             </div>
             <p className="text-[11px] text-zinc-500">
-              Table active : <code className="text-zinc-400">public.payments</code>{" "}
+              Table active : <code className="text-emerald-400">public.payments</code>{" "}
               ({transactions.length} enregistrements synchronisés)
             </p>
           </div>
 
           {/* Card 2 : Passerelle GeniusPay */}
-          <div className="rounded-xl border border-white/5 bg-zinc-950 p-4 space-y-2">
+          <div className="rounded-xl border border-emerald-500/20 bg-black p-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
                 Passerelle GeniusPay
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 Opérationnel
               </span>
@@ -1145,13 +1146,13 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 3 : Session Administrateur */}
-          <div className="rounded-xl border border-white/5 bg-zinc-950 p-4 space-y-2 sm:col-span-2 lg:col-span-1">
+          <div className="rounded-xl border border-emerald-500/20 bg-black p-4 space-y-2 sm:col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
                 <Users className="h-3.5 w-3.5 text-emerald-400" />
                 Session Administrateur
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
                 Active
               </span>
             </div>

@@ -3,22 +3,31 @@
 @tailwind utilities;
 
 /* ============================================
-   KADMIEL BUSINESS — Global Styles
+   KADMIEL BUSINESS — Palette Officielle Vert & Noir
    ============================================ */
 
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #000000;
+    color: #ffffff;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900;
+    background-color: #000000;
+    color: #ffffff;
+  }
+
+  /* Sélection de texte vert & noir */
+  ::selection {
+    background-color: #10b981;
+    color: #000000;
   }
 }
 
 @layer utilities {
-  /* Masquer le scrollbar sur la page de paiement mobile */
+  /* Masquer le scrollbar proprement */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
