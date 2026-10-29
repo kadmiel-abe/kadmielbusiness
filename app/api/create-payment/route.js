@@ -71,7 +71,10 @@ export async function POST(request) {
     }
 
     // 4. Extraction souple et normalisation des informations client
+    const client = payment.client || {};
     const customerName =
+      client.name ||
+      client.nom ||
       payment.customer_name ||
       payment.customer?.name ||
       payment.client_name ||
@@ -79,6 +82,8 @@ export async function POST(request) {
       'Client';
 
     const customerPhone =
+      client.phone ||
+      client.telephone ||
       payment.customer_phone ||
       payment.customer?.phone ||
       payment.client_phone ||
