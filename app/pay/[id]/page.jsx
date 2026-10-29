@@ -13,7 +13,9 @@ import {
   Receipt,
   Smartphone,
   Lock,
+  FileText,
 } from "lucide-react";
+import { generateReceiptPDF } from "@/lib/exportUtils";
 
 /* ─────────────────────────────────────────────────────────────
    HELPERS : FORMATAGE
@@ -276,6 +278,16 @@ export default function PublicPaymentPage() {
                   {payment.service_name}
                 </span>
               </div>
+
+              {/* Bouton Téléchargement Reçu PDF officiel */}
+              <button
+                type="button"
+                onClick={() => generateReceiptPDF(payment)}
+                className="w-full mt-2 h-11 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition-all flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span>Télécharger mon reçu officiel (PDF)</span>
+              </button>
             </div>
           ) : isPendingVerification ? (
             /* CAS 2 : PAIEMENT DE SECOURS EN VÉRIFICATION */

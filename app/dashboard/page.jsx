@@ -23,7 +23,13 @@ import {
   Filter,
   CheckCircle2,
   XCircle,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
+import {
+  exportTransactionsToCSV,
+  generateReceiptPDF,
+} from "@/lib/exportUtils";
 import {
   Area,
   AreaChart,
@@ -488,6 +494,16 @@ export default function DashboardPage() {
             <option>Année</option>
           </select>
 
+          <button
+            type="button"
+            onClick={() => exportTransactionsToCSV(filteredTransactions, "kadmiel-business-transactions")}
+            title="Exporter les transactions filtrées au format CSV pour Excel"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-zinc-900 hover:bg-zinc-800 px-4 text-sm font-semibold text-zinc-200 transition"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+            <span>Exporter CSV ({filteredTransactions.length})</span>
+          </button>
+
           <Link
             href="/dashboard/new"
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-bold text-slate-950 transition shadow-lg shadow-emerald-500/20"
@@ -949,6 +965,18 @@ export default function DashboardPage() {
                           >
                             <ExternalLink className="h-4 w-4" />
                           </a>
+
+                          {/* Télécharger Reçu PDF (si payé) */}
+                          {isPaid && (
+                            <button
+                              type="button"
+                              onClick={() => generateReceiptPDF(tx)}
+                              title="Télécharger le reçu officiel PDF"
+                              className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
+                            >
+                              <FileText className="h-4 w-4 text-emerald-400" />
+                            </button>
+                          )}
 
                           {/* Validation Manuelle (si non payé) */}
                           {!isPaid && (
