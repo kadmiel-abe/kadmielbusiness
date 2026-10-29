@@ -34,6 +34,7 @@ export default function PublicPaymentPage() {
   const [transactionRef, setTransactionRef] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualSuccess, setManualSuccess] = useState(false);
+  const [payingGenius, setPayingGenius] = useState(false);
 
   // Charger les détails du paiement
   useEffect(() => {
@@ -59,10 +60,32 @@ export default function PublicPaymentPage() {
     }
   }, [paymentId]);
 
-  // Simulation du clic sur "Payer" (redirection vers GeniusPay ou passerelle)
-  const handlePayGenius = () => {
-    // TODO: Intégrer l'URL de redirection GeniusPay reçue lors de la création
-    alert("Redirection vers la passerelle de paiement sécurisée (Wave / Orange Money / MTN)...");
+  // Initialisation de la session GeniusPay et redirection sécurisée
+  const handlePayGenius = async () => {
+    try {
+      setPayingGenius(true);
+      const res = await fetch("/api/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Impossible d'initialiser le paiement.");
+      }
+
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        throw new Error("L'adresse de redirection n'a pas été fournie.");
+      }
+    } catch (err) {
+      alert(err.message || "Erreur lors de l'accès à la passerelle de paiement.");
+    } finally {
+      setPayingGenius(false);
+    }
   };
 
   // Soumission du mode de secours (ID de transaction manuel)
@@ -72,12 +95,12 @@ export default function PublicPaymentPage() {
 
     setManualSubmitting(true);
     try {
-      const res = await fetch(`/api/payments/manual-validate`, {
+      const res = await fetch("/api/manual-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: paymentId,
-          transaction_ref: transactionRef.trim(),
+          paymentId: paymentId,
+          manualTxId: transactionRef.trim(),
         }),
       });
 
@@ -182,9 +205,10 @@ export default function PublicPaymentPage() {
               {/* Bouton de Paiement Principal */}
               <button
                 onClick={handlePayGenius}
-                className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                disabled={payingGenius}
+                className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
               >
-                <span>Payer par Wave / Orange / MTN</span>
+                <span>{payingGenius ? "Initialisation du paiement..." : "Payer par Wave / Orange / MTN"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
