@@ -25,6 +25,7 @@ import {
   XCircle,
   FileSpreadsheet,
   FileText,
+  CalendarDays,
 } from "lucide-react";
 import {
   exportTransactionsToCSV,
@@ -114,12 +115,14 @@ function ChartTooltip({ active, payload, label }) {
 export default function DashboardPage() {
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [period, setPeriod] = useState("Ce mois");
-  const [copiedId, setCopiedId] = useState("");
-  const [updatingId, setUpdatingId] = useState("");
   const [toast, setToast] = useState("");
   const [actionError, setActionError] = useState("");
   const [loadError, setLoadError] = useState("");
+
+  // Filtre de Période Avancé avec Calendrier
+  const [periodPreset, setPeriodPreset] = useState("month"); // 'today' | 'week' | 'month' | 'year' | 'custom'
+  const [customStartDate, setCustomStartDate] = useState(""); // YYYY-MM-DD
+  const [customEndDate, setCustomEndDate] = useState("");     // YYYY-MM-DD
 
   // Nouveaux états : Recherche et Filtres
   const [searchQuery, setSearchQuery] = useState("");
@@ -163,18 +166,48 @@ export default function DashboardPage() {
     loadTransactions();
   }, [loadTransactions]);
 
-  // Filtrage par période (mois ou année)
+  // Filtrage avancé par période (Aujourd'hui, Cette semaine, Ce mois, Année, Personnalisé avec dates)
   const periodTransactions = useMemo(() => {
     const now = new Date();
+    let start = null;
+    let end = null;
+
+    if (periodPreset === "today") {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    } else if (periodPreset === "week") {
+      // Semaine en cours (Lundi à Dimanche)
+      const day = now.getDay();
+      const diffToMonday = (day === 0 ? -6 : 1) - day;
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday, 0, 0, 0, 0);
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+    } else if (periodPreset === "month") {
+      // Mois en cours (1er au dernier jour du mois)
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (periodPreset === "year") {
+      // Année en cours (1er janvier au 31 décembre)
+      start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    } else if (periodPreset === "custom") {
+      if (customStartDate) {
+        const [sy, sm, sd] = customStartDate.split("-").map(Number);
+        start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+      }
+      if (customEndDate) {
+        const [ey, em, ed] = customEndDate.split("-").map(Number);
+        end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+      }
+    }
+
     return transactions.filter((tx) => {
       const date = dateOf(tx);
       if (!date) return false;
-      return period === "Ce mois"
-        ? date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear()
-        : date.getFullYear() === now.getFullYear();
+      if (start && date < start) return false;
+      if (end && date > end) return false;
+      return true;
     });
-  }, [period, transactions]);
+  }, [transactions, periodPreset, customStartDate, customEndDate]);
 
   // Calcul dynamique des KPIs
   useEffect(() => {
@@ -480,36 +513,85 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="sr-only" htmlFor="dashboard-period">
-            Période
-          </label>
-          <select
-            id="dashboard-period"
-            value={period}
-            onChange={(event) => setPeriod(event.target.value)}
-            className="h-11 rounded-xl border border-emerald-500/30 bg-black px-3.5 text-sm text-zinc-200 outline-none transition focus:border-emerald-400 font-semibold"
-          >
-            <option>Ce mois</option>
-            <option>Année</option>
-          </select>
+        {/* Contrôles du Header : Sélecteur de Période Avancé + Bouton Nouveau Lien */}
+        <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-3">
+          {/* Composant de Sélection de Période Avancé avec Raccourcis et Calendrier */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#0a0a0a] border border-emerald-500/25 shadow-lg overflow-x-auto no-scrollbar">
+              <span className="pl-2.5 pr-1 text-emerald-400 shrink-0">
+                <CalendarDays className="h-4 w-4" />
+              </span>
 
-          <button
-            type="button"
-            onClick={() => exportTransactionsToCSV(filteredTransactions, "kadmiel-business-transactions")}
-            title="Exporter les transactions filtrées au format CSV pour Excel"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-zinc-950 hover:bg-emerald-500/10 hover:border-emerald-400 px-4 text-sm font-semibold text-emerald-400 transition"
-          >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
-            <span>Exporter CSV ({filteredTransactions.length})</span>
-          </button>
+              {[
+                { id: "today", label: "Aujourd'hui" },
+                { id: "week", label: "Cette semaine" },
+                { id: "month", label: "Ce mois" },
+                { id: "year", label: "Année" },
+                { id: "custom", label: "Personnalisé" },
+              ].map(({ id, label }) => {
+                const active = periodPreset === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPeriodPreset(id)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 ${
+                      active
+                        ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
 
+            {/* Champs Date début & Date fin affichés quand "Personnalisé" est sélectionné */}
+            {periodPreset === "custom" && (
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-black border border-emerald-500/30 animate-slide-up text-xs flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-zinc-400">Du</span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-zinc-400">Au</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
+                  />
+                </div>
+                {(customStartDate || customEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomStartDate("");
+                      setCustomEndDate("");
+                    }}
+                    title="Effacer les dates"
+                    className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Bouton Nouveau Lien (Action Principale) */}
           <Link
             href="/dashboard/new"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400 shrink-0 active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            Nouveau lien
+            <span>Nouveau lien</span>
           </Link>
         </div>
       </header>
@@ -721,7 +803,7 @@ export default function DashboardPage() {
         id="transactions"
         className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] overflow-hidden shadow-2xl"
       >
-        {/* Barre d'outils du tableau : Titre + Recherche + Filtres */}
+        {/* Barre d'outils du tableau : Titre + Recherche + Export CSV + Filtres */}
         <div className="p-5 border-b border-emerald-500/15 space-y-4 bg-black/40">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -733,28 +815,51 @@ export default function DashboardPage() {
                 {filteredTransactions.length} transaction
                 {filteredTransactions.length > 1 ? "s" : ""} trouvée
                 {filteredTransactions.length > 1 ? "s" : ""}
+                {periodPreset === "custom" && customStartDate && customEndDate && (
+                  <span className="text-emerald-400 font-mono ml-1">
+                    ({customStartDate} au {customEndDate})
+                  </span>
+                )}
               </p>
             </div>
 
-            {/* Barre de Recherche Instantanée */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Rechercher client, service, ID SMS..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-8 text-xs rounded-xl bg-black border border-emerald-500/30 text-white placeholder:text-zinc-500 outline-none focus:border-emerald-400 transition"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+              {/* Barre de Recherche Instantanée */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher client, service, ID SMS..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-9 pl-9 pr-8 text-xs rounded-xl bg-black border border-emerald-500/30 text-white placeholder:text-zinc-500 outline-none focus:border-emerald-400 transition"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Bouton Exporter CSV repositionné dans le tableau et contextualisé */}
+              <button
+                type="button"
+                onClick={() =>
+                  exportTransactionsToCSV(
+                    filteredTransactions,
+                    `kadmiel-transactions-${periodPreset}`
+                  )
+                }
+                title="Exporter les transactions filtrées au format CSV pour Excel"
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-black hover:bg-emerald-500/15 hover:border-emerald-400 px-3.5 text-xs font-bold text-emerald-400 transition-all shrink-0 active:scale-95 shadow-sm"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Exporter CSV ({filteredTransactions.length})</span>
+              </button>
             </div>
           </div>
 
