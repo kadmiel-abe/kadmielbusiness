@@ -26,6 +26,7 @@ import {
   FileSpreadsheet,
   FileText,
   CalendarDays,
+  Trash2,
 } from "lucide-react";
 import {
   exportTransactionsToCSV,
@@ -117,6 +118,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState("");
   const [updatingId, setUpdatingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [toast, setToast] = useState("");
   const [actionError, setActionError] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -438,6 +440,45 @@ export default function DashboardPage() {
       );
     } finally {
       setUpdatingId("");
+    }
+  };
+
+  // Supprimer définitivement un lien de paiement
+  const deletePaymentLink = async (tx) => {
+    const service = txService(tx);
+    const client = clientName(tx);
+    const confirmed = window.confirm(
+      `Confirmez-vous la suppression du lien pour "${client}" (${service}) ?\nCette action est irréversible.`
+    );
+    if (!confirmed) return;
+
+    setActionError("");
+    setDeletingId(tx.id);
+    try {
+      const res = await fetch("/api/payments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: tx.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Impossible de supprimer ce lien.");
+      }
+
+      // Mise à jour optimiste immédiate
+      setTransactions((current) => current.filter((item) => item.id !== tx.id));
+      setToast("Lien de paiement supprimé avec succès !");
+      window.setTimeout(() => setToast(""), 2200);
+
+      // Recharger pour synchroniser les calculs et KPIs
+      await loadTransactions(false);
+    } catch (error) {
+      console.error("Erreur lors de la suppression :", error);
+      setActionError(
+        error.message || "Erreur lors de la suppression du lien."
+      );
+    } finally {
+      setDeletingId("");
     }
   };
 
@@ -1091,7 +1132,7 @@ export default function DashboardPage() {
                             <button
                               type="button"
                               onClick={() => updatePaymentStatus(tx, "paye")}
-                              disabled={updatingId === tx.id}
+                              disabled={updatingId === tx.id || deletingId === tx.id}
                               title="Valider manuellement le paiement"
                               className="rounded-lg p-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition font-bold disabled:opacity-50"
                             >
@@ -1103,12 +1144,27 @@ export default function DashboardPage() {
                             </button>
                           )}
 
+                          {/* Bouton de suppression de lien — JUSTE À CÔTÉ DU BOUTON VALIDER */}
+                          <button
+                            type="button"
+                            onClick={() => deletePaymentLink(tx)}
+                            disabled={deletingId === tx.id || updatingId === tx.id}
+                            title="Supprimer ce lien de paiement"
+                            className="rounded-lg p-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition disabled:opacity-50"
+                          >
+                            {deletingId === tx.id ? (
+                              <LoaderCircle className="h-4 w-4 animate-spin text-rose-400" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+
                           {/* Rejeter (si à vérifier) */}
                           {isToVerify && (
                             <button
                               type="button"
                               onClick={() => updatePaymentStatus(tx, "echoue")}
-                              disabled={updatingId === tx.id}
+                              disabled={updatingId === tx.id || deletingId === tx.id}
                               title="Rejeter la référence de secours"
                               className="rounded-lg p-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold disabled:opacity-50"
                             >

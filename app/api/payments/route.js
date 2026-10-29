@@ -144,3 +144,70 @@ export async function PATCH(request) {
     );
   }
 }
+
+/**
+ * DELETE /api/payments
+ * Supprime un lien de paiement.
+ * Sécurisé : session administrateur requise.
+ */
+export async function DELETE(request) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Session non authentifiée. Veuillez vous connecter.' },
+        { status: 401 }
+      );
+    }
+
+    let id;
+    try {
+      const body = await request.json();
+      id = body?.id;
+    } catch {
+      // Pas de corps JSON fourni
+    }
+
+    if (!id) {
+      const { searchParams } = new URL(request.url);
+      id = searchParams.get('id');
+    }
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Identifiant du lien de paiement manquant.' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabaseAdmin
+      .from('payments')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[API Payments DELETE] Erreur suppression :', error);
+      return NextResponse.json(
+        { error: 'Impossible de supprimer ce lien.', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      deletedId: id,
+      message: 'Lien de paiement supprimé avec succès.',
+    });
+  } catch (error) {
+    console.error('[API Payments DELETE] Exception serveur :', error);
+    return NextResponse.json(
+      { error: 'Erreur serveur interne lors de la suppression.' },
+      { status: 500 }
+    );
+  }
+}
+
