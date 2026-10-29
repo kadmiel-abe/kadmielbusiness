@@ -115,6 +115,8 @@ function ChartTooltip({ active, payload, label }) {
 export default function DashboardPage() {
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
   const [toast, setToast] = useState("");
   const [actionError, setActionError] = useState("");
   const [loadError, setLoadError] = useState("");
