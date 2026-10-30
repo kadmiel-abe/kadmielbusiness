@@ -193,10 +193,10 @@ export async function POST(request) {
 
     // 5. Application idempotente dans Supabase
     if (isSuccess) {
-      // 1. Récupération des données actuelles du paiement
+      // 1. Récupération résiliente des données actuelles du paiement
       const { data: currentPayment, error: fetchErr } = await supabaseAdmin
         .from('payments')
-        .select('id, status, is_single_use, max_uses, times_used')
+        .select('*')
         .eq('id', paymentId)
         .single();
 
@@ -221,23 +221,49 @@ export async function POST(request) {
       const newTimesUsed = currentTimesUsed + 1;
       const shouldClose = isSingleUse || newTimesUsed >= maxUses;
 
-      const { data: updated, error: updateError } = await supabaseAdmin
+      const baseUpdatePayload = {
+        status: shouldClose ? 'paye' : currentPayment.status,
+        payment_method: provider,
+        geniuspay_ref: transactionReference || undefined,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Tente la mise à jour avec les champs étendus (times_used, paid_at)
+      let { data: updated, error: updateError } = await supabaseAdmin
         .from('payments')
         .update({
-          status: shouldClose ? 'paye' : currentPayment.status,
+          ...baseUpdatePayload,
           times_used: newTimesUsed,
-          payment_method: provider,
-          geniuspay_ref: transactionReference || undefined,
           paid_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         })
         .eq('id', paymentId)
         .select()
         .single();
 
+      // Repli résilient si les colonnes étendues n'existent pas encore dans Supabase
+      if (updateError && updateError.message && (updateError.message.includes('column') || updateError.message.includes('schema cache'))) {
+        console.warn('[Webhook] Repli sur les colonnes de base pour la mise à jour :', updateError.message);
+        const retry = await supabaseAdmin
+          .from('payments')
+          .update(baseUpdatePayload)
+          .eq('id', paymentId)
+          .select()
+          .single();
+        updated = retry.data;
+        updateError = retry.error;
+      }
+
+      if (updateError || !updated) {
+        console.error('[Webhook] Erreur mise à jour paiement en base :', updateError);
+        return NextResponse.json(
+          { error: 'Erreur lors de la mise à jour du statut.' },
+          { status: 500 }
+        );
+      }
+
       // Envoi automatique du reçu officiel par email si une adresse est associée
       try {
-        let clientEmail = updated.receipt_email;
+        let clientEmail = updated?.receipt_email;
         if (!clientEmail && updated.client_id) {
           const { data: clientObj } = await supabaseAdmin
             .from('clients')

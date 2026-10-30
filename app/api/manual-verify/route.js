@@ -34,7 +34,7 @@ export async function POST(request) {
     // Vérification que le paiement existe et respecte les conditions de validité
     const { data: payment, error: fetchError } = await supabaseAdmin
       .from('payments')
-      .select('id, status, expires_at, is_single_use, max_uses, times_used')
+      .select('*')
       .eq('id', paymentId)
       .single();
 

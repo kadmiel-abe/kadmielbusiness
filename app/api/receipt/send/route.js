@@ -93,11 +93,15 @@ export async function POST(request) {
       const whatsappUrl = buildWhatsAppReceiptUrl(payment, baseUrl);
       const whatsappMessage = buildWhatsAppReceiptMessage(payment, baseUrl);
 
-      // Enregistrer l'horodatage d'envoi du reçu
-      await supabaseAdmin
-        .from("payments")
-        .update({ receipt_sent_at: new Date().toISOString() })
-        .eq("id", paymentId);
+      // Enregistrer l'horodatage d'envoi du reçu (non bloquant si colonne non migrée)
+      try {
+        await supabaseAdmin
+          .from("payments")
+          .update({ receipt_sent_at: new Date().toISOString() })
+          .eq("id", paymentId);
+      } catch (logErr) {
+        console.warn("[Receipt Send] Mise à jour receipt_sent_at ignorée :", logErr?.message);
+      }
 
       return NextResponse.json({
         success: true,

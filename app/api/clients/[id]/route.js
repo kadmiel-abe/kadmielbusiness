@@ -43,11 +43,11 @@ export async function GET(request, { params }) {
       );
     }
 
-    // 2. Récupération de tous les paiements liés à ce client (ou par numéro de téléphone)
+    // 2. Récupération de tous les paiements liés à ce client
     const { data: paymentsData, error: payErr } = await supabaseAdmin
       .from('payments')
       .select('*')
-      .or(`client_id.eq.${id},client_phone.eq.${client.phone}`)
+      .eq('client_id', id)
       .order('created_at', { ascending: false });
 
     const payments = paymentsData || [];

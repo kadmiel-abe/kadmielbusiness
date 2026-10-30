@@ -122,10 +122,10 @@ export async function PATCH(request) {
       );
     }
 
-    // Récupération des informations de validité et d'usage actuelles
+    // Récupération résiliente des informations actuelles du paiement
     const { data: currentPayment } = await supabaseAdmin
       .from('payments')
-      .select('id, status, is_single_use, max_uses, times_used, payment_method')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -136,24 +136,39 @@ export async function PATCH(request) {
     const shouldClose = isSingleUse || newTimesUsed >= maxUses;
     const targetStatus = (newStatus === 'paye' && shouldClose) ? 'paye' : newStatus;
 
-    const updatePayload = {
+    const baseUpdatePayload = {
       status: targetStatus,
-      times_used: newTimesUsed,
       updated_at: new Date().toISOString(),
     };
-    if (newStatus === 'paye') {
-      updatePayload.paid_at = new Date().toISOString();
-      if (methodToSave) {
-        updatePayload.payment_method = methodToSave;
-      }
+    if (newStatus === 'paye' && methodToSave) {
+      baseUpdatePayload.payment_method = methodToSave;
     }
 
-    const { data: updated, error } = await supabaseAdmin
+    const extendedUpdatePayload = {
+      ...baseUpdatePayload,
+      times_used: newTimesUsed,
+      ...(newStatus === 'paye' ? { paid_at: new Date().toISOString() } : {}),
+    };
+
+    let { data: updated, error } = await supabaseAdmin
       .from('payments')
-      .update(updatePayload)
+      .update(extendedUpdatePayload)
       .eq('id', id)
       .select('*, client:clients(*)')
       .single();
+
+    // Repli résilient si les colonnes times_used ou paid_at ne sont pas encore présentes
+    if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
+      console.warn('[API Payments PATCH] Repli sur les colonnes de base :', error.message);
+      const retry = await supabaseAdmin
+        .from('payments')
+        .update(baseUpdatePayload)
+        .eq('id', id)
+        .select('*, client:clients(*)')
+        .single();
+      updated = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('[API Payments PATCH] Erreur mise à jour :', error);
