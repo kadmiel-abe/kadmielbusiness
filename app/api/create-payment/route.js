@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { initiateGeniusPayment, normalizeProvider } from '@/lib/geniuspay';
+import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,13 +11,26 @@ export const dynamic = 'force-dynamic';
  * Initialise une session de paiement sécurisée auprès de l'API GeniusPay
  * pour Wave, Orange Money, MTN MoMo ou Moov Money.
  *
- * Paramètres attendus dans le body JSON :
- * - paymentId (requis) : ID du paiement dans Supabase
- * - provider (optionnel) : 'wave' | 'orange' | 'mtn' | 'moov'
+ * Sécurisé : Limitation de débit (Rate Limiting) et validation stricte des paramètres.
  */
 export async function POST(request) {
   try {
-    // 1. Extraction et validation du corps de requête
+    // 1. Protection Anti-Abus & Déni de Service (Rate Limiting)
+    const clientIp = getClientIp(request);
+    const rateCheck = checkRateLimit({
+      key: `create-payment:${clientIp}`,
+      limit: 15,
+      windowMs: 5 * 60 * 1000,
+    });
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Trop de requêtes d\'initialisation. Veuillez patienter un moment.' },
+        { status: 429 }
+      );
+    }
+
+    // 2. Extraction et validation du corps de requête
     let body;
     try {
       body = await request.json();
@@ -29,18 +43,26 @@ export async function POST(request) {
 
     const { paymentId, provider } = body || {};
 
-    if (!paymentId) {
+    if (!paymentId || typeof paymentId !== 'string') {
       return NextResponse.json(
         { error: 'Le champ "paymentId" est requis.' },
         { status: 400 }
       );
     }
 
-    // 2. Récupération des informations du paiement et du client dans Supabase (par id ou token)
+    const cleanPaymentId = paymentId.trim();
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleanPaymentId)) {
+      return NextResponse.json(
+        { error: 'Format d\'identifiant de paiement invalide.' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Récupération des informations du paiement et du client dans Supabase (par id ou token)
     let { data: payment, error: dbError } = await supabaseAdmin
       .from('payments')
       .select('*, client:clients(*)')
-      .eq('id', paymentId)
+      .eq('id', cleanPaymentId)
       .maybeSingle();
 
     if (!payment) {
@@ -48,7 +70,7 @@ export async function POST(request) {
         const tokenRes = await supabaseAdmin
           .from('payments')
           .select('*, client:clients(*)')
-          .eq('token', paymentId)
+          .eq('token', cleanPaymentId)
           .maybeSingle();
         if (tokenRes.data) {
           payment = tokenRes.data;
@@ -70,13 +92,13 @@ export async function POST(request) {
       );
     }
 
-    // 3. Vérification de l'expiration du lien
+    // 4. Vérification de l'expiration du lien
     const now = new Date();
     if (payment.expires_at && now > new Date(payment.expires_at)) {
       supabaseAdmin
         .from('payments')
         .update({ status: 'expire', updated_at: now.toISOString() })
-        .eq('id', paymentId)
+        .eq('id', payment.id)
         .catch(() => {});
 
       return NextResponse.json(
@@ -85,7 +107,7 @@ export async function POST(request) {
       );
     }
 
-    // 4. Vérification de l'usage unique (verrouillage) ou dépassement du quota
+    // 5. Vérification de l'usage unique (verrouillage) ou dépassement du quota
     const isSingleUse = payment.is_single_use !== false;
     const maxUses = Number(payment.max_uses) || 1;
     const timesUsed = Number(payment.times_used) || 0;
@@ -104,7 +126,7 @@ export async function POST(request) {
       );
     }
 
-    // 5. Normalisation des informations client
+    // 6. Normalisation des informations client
     const client = payment.client || {};
     const customerName =
       client.name ||
@@ -130,12 +152,12 @@ export async function POST(request) {
       process.env.NEXT_PUBLIC_APP_URL ||
       'https://kadmielbusiness.vercel.app';
 
-    const returnUrl = `${origin}/pay/${paymentId}`;
+    const returnUrl = `${origin}/pay/${payment.id}`;
     const selectedProvider = normalizeProvider(provider);
 
-    // 6. Appel du module GeniusPay backend
+    // 7. Appel du module GeniusPay backend
     const geniusResult = await initiateGeniusPayment({
-      paymentId,
+      paymentId: payment.id,
       amount: payment.amount_total,
       description: payment.service_name || 'Paiement prestation',
       customer: {
@@ -154,7 +176,7 @@ export async function POST(request) {
       },
     });
 
-    // 7. Enregistrement de la référence GeniusPay et du moyen de paiement dans Supabase
+    // 8. Enregistrement de la référence GeniusPay et du moyen de paiement dans Supabase
     const updatePayload = {
       updated_at: new Date().toISOString(),
     };
@@ -168,7 +190,7 @@ export async function POST(request) {
     const { error: updateErr } = await supabaseAdmin
       .from('payments')
       .update(updatePayload)
-      .eq('id', paymentId);
+      .eq('id', payment.id);
 
     if (updateErr) {
       console.warn('[Create-Payment] Sauvegarde de la référence non bloquante :', updateErr);

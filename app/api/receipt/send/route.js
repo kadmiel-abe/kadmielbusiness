@@ -5,6 +5,7 @@ import {
   buildWhatsAppReceiptMessage,
   sendReceiptEmail,
 } from "@/lib/receiptService";
+import { getClientIp, checkRateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,24 +13,65 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/receipt/send
  * Déclenche l'envoi automatique d'un reçu officiel certifié par Email ou WhatsApp.
+ * Sécurisé : Rate limiting anti-spam et validation stricte du format email et paymentId.
  */
 export async function POST(request) {
   try {
-    const body = await request.json();
+    // 1. Protection Anti-Spam / Rate Limiting (6 envois max par 10 min par IP)
+    const clientIp = getClientIp(request);
+    const rateCheck = checkRateLimit({
+      key: `receipt-send:${clientIp}`,
+      limit: 6,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Trop de demandes d'envoi de reçu. Veuillez patienter quelques minutes." },
+        { status: 429 }
+      );
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Format JSON invalide dans le corps de la requête." },
+        { status: 400 }
+      );
+    }
+
     const { paymentId, email, channel = "email" } = body || {};
 
-    if (!paymentId) {
+    if (!paymentId || typeof paymentId !== "string") {
       return NextResponse.json(
         { error: "L'identifiant du paiement (paymentId) est requis." },
         { status: 400 }
       );
     }
 
-    // Récupération de la transaction et des informations client associées
+    const cleanPaymentId = paymentId.trim();
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleanPaymentId)) {
+      return NextResponse.json(
+        { error: "Format d'identifiant de paiement invalide." },
+        { status: 400 }
+      );
+    }
+
+    const cleanChannel = String(channel).toLowerCase().trim();
+    if (!["email", "whatsapp"].includes(cleanChannel)) {
+      return NextResponse.json(
+        { error: "Canal d'envoi invalide ('email' ou 'whatsapp' attendu)." },
+        { status: 400 }
+      );
+    }
+
+    // 2. Récupération de la transaction et des informations client associées
     const { data: payment, error: fetchErr } = await supabaseAdmin
       .from("payments")
       .select("*, client:clients(*)")
-      .eq("id", paymentId)
+      .eq("id", cleanPaymentId)
       .single();
 
     if (fetchErr || !payment) {
@@ -39,7 +81,7 @@ export async function POST(request) {
       );
     }
 
-    // Vérifier que le paiement est bien payé
+    // 3. Vérifier que le paiement est bien payé
     const isPaid = payment.status === "paye" || payment.statut === "paye";
     if (!isPaid) {
       return NextResponse.json(
@@ -53,11 +95,13 @@ export async function POST(request) {
     const baseUrl = `${protocol}://${host}`;
 
     const client = payment.client || {};
-    const targetEmail = (email || client.email || "").trim();
+    const targetEmail = String(email || client.email || "").trim().slice(0, 100);
 
-    // 1. Canal EMAIL
-    if (channel === "email") {
-      if (!targetEmail) {
+    // 4. Canal EMAIL
+    if (cleanChannel === "email") {
+      // Validation stricte du format email (RFC 5322 simplifié)
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!targetEmail || !emailRegex.test(targetEmail)) {
         return NextResponse.json(
           { error: "Veuillez renseigner une adresse email valide pour recevoir le reçu." },
           { status: 400 }
@@ -88,8 +132,8 @@ export async function POST(request) {
       });
     }
 
-    // 2. Canal WHATSAPP
-    if (channel === "whatsapp") {
+    // 5. Canal WHATSAPP
+    if (cleanChannel === "whatsapp") {
       const whatsappUrl = buildWhatsAppReceiptUrl(payment, baseUrl);
       const whatsappMessage = buildWhatsAppReceiptMessage(payment, baseUrl);
 
@@ -98,7 +142,7 @@ export async function POST(request) {
         await supabaseAdmin
           .from("payments")
           .update({ receipt_sent_at: new Date().toISOString() })
-          .eq("id", paymentId);
+          .eq("id", payment.id);
       } catch (logErr) {
         console.warn("[Receipt Send] Mise à jour receipt_sent_at ignorée :", logErr?.message);
       }
@@ -112,7 +156,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json(
-      { error: "Canal d'envoi invalide ('email' ou 'whatsapp' attendu)." },
+      { error: "Canal non supporté." },
       { status: 400 }
     );
   } catch (error) {

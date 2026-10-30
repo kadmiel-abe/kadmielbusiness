@@ -4,56 +4,81 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/payments/[id]
+ * Endpoint public de consultation d'une facture par son identifiant ou son token unique.
+ * Sécurisé : Validation rigoureuse du format de paramètre anti-injection PostgREST.
+ */
 export async function GET(request, { params }) {
   try {
-    const { id } = await params;
+    const resolvedParams = await params;
+    const rawId = resolvedParams?.id;
 
-    if (!id) {
+    if (!rawId || typeof rawId !== 'string') {
       return NextResponse.json({ error: 'ID de paiement manquant.' }, { status: 400 });
     }
 
-    // 1. Recherche par UUID (id) ou par token unique
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const cleanId = rawId.trim();
+
+    // 1. Validation stricte du format (alphanumérique, tirets, underscores - max 64 car.)
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleanId)) {
+      return NextResponse.json(
+        { error: 'Format d\'identifiant ou de jeton invalide.' },
+        { status: 400 }
+      );
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
     let payment = null;
     let error = null;
 
+    // 2. Recherche prioritaire par UUID (id)
     if (isUuid) {
       const res = await supabaseAdmin
         .from('payments')
         .select('*, client:clients(id, name, phone, email)')
-        .eq('id', id)
+        .eq('id', cleanId)
         .maybeSingle();
       payment = res.data;
       error = res.error;
     }
 
-    // Si non trouvé par ID ou si non-UUID, chercher par token dans payments
+    // 3. Si non trouvé par ID ou si jeton alphanumérique, chercher par colonne token
     if (!payment) {
       try {
         const tokenRes = await supabaseAdmin
           .from('payments')
           .select('*, client:clients(id, name, phone, email)')
-          .eq('token', id)
+          .eq('token', cleanId)
           .maybeSingle();
         if (tokenRes.data) {
           payment = tokenRes.data;
           error = null;
         }
       } catch {
-        // Ignorer si colonne absente
+        // Ignorer si colonne token absente
       }
     }
 
-    // Repli de compatibilité dans la table payment_links
+    // 4. Repli de compatibilité sécurisé dans la table payment_links (sans interpolation non assainie)
     if (!payment) {
       try {
-        const linkRes = await supabaseAdmin
-          .from('payment_links')
-          .select('*, client:clients(id, name, phone, email)')
-          .or(`token.eq.${id},id.eq.${isUuid ? id : '00000000-0000-0000-0000-000000000000'}`)
-          .maybeSingle();
+        let linkRes;
+        if (isUuid) {
+          linkRes = await supabaseAdmin
+            .from('payment_links')
+            .select('*, client:clients(id, name, phone, email)')
+            .eq('id', cleanId)
+            .maybeSingle();
+        } else {
+          linkRes = await supabaseAdmin
+            .from('payment_links')
+            .select('*, client:clients(id, name, phone, email)')
+            .eq('token', cleanId)
+            .maybeSingle();
+        }
 
-        if (linkRes.data) {
+        if (linkRes?.data) {
           const l = linkRes.data;
           payment = {
             id: l.id,

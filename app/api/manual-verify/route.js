@@ -1,31 +1,48 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendReceiptEmail } from '@/lib/receiptService';
+import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
  * =========================================================================
- * ROUTE /api/manual-verify — GESTION DU MODE DE SECOURS
+ * ROUTE /api/manual-verify — GESTION DU MODE DE SECOURS SÉCURISÉE
  * =========================================================================
- * 1. POST : Déclenché par le CLIENT sur la page de paiement
+ * 1. GET : Déclenché par l'ADMINISTRATEUR (Dashboard)
+ *    Sécurisé : Nécessite une session Supabase active.
+ *    Liste tous les paiements avec le statut 'a_verifier'.
+ *
+ * 2. POST : Déclenché par le CLIENT sur la page de paiement
+ *    Public mais protégé contre les abus (Rate Limiting + validation stricte).
  *    Enregistre la référence de transaction SMS et passe le statut en 'a_verifier'.
  *
- * 2. PATCH : Déclenché par l'ADMINISTRATEUR (Dashboard)
+ * 3. PATCH : Déclenché par l'ADMINISTRATEUR (Dashboard)
+ *    Sécurisé : Nécessite une session Supabase active.
  *    Permet la validation ('validate') ou le refus ('reject') d'un paiement de secours.
- *    - Si 'validate' : statut 'paye', verrouillage du lien (usage unique), envoi du reçu.
- *    - Si 'reject'   : statut 'echoue'.
- *
- * 3. GET : Récupère la liste des paiements en attente de vérification manuelle.
  */
 
 /**
- * GET /api/manual-verify
- * Liste tous les paiements avec le statut 'a_verifier'.
+ * GET /api/manual-verify (ADMIN SEULEMENT)
  */
 export async function GET() {
   try {
+    // 1. Contrôle d'accès strict : Vérification de la session administrateur
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Accès refusé. Session administrateur requise.' },
+        { status: 401 }
+      );
+    }
+
     const { data: pending, error } = await supabaseAdmin
       .from('payments')
       .select('*, client:clients(*)')
@@ -48,11 +65,28 @@ export async function GET() {
 }
 
 /**
- * POST /api/manual-verify (CLIENT)
- * Permet au client de soumettre la référence SMS de son transfert mobile money.
+ * POST /api/manual-verify (CLIENT - SOUMISSION SMS TRANSACTION)
+ * Sécurisé avec limitation de débit (5 requêtes par 5 min par IP) et assainissement des entrées.
  */
 export async function POST(request) {
   try {
+    // 1. Protection Anti-Brute Force / Déni de Service (Rate Limiting)
+    const clientIp = getClientIp(request);
+    const rateCheck = checkRateLimit({
+      key: `manual-verify:${clientIp}`,
+      limit: 5,
+      windowMs: 5 * 60 * 1000,
+    });
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Trop de tentatives de soumission. Veuillez patienter quelques minutes avant de réessayer.',
+        },
+        { status: 429 }
+      );
+    }
+
     let body;
     try {
       body = await request.json();
@@ -62,18 +96,43 @@ export async function POST(request) {
 
     const { paymentId, manualTxId } = body || {};
 
-    if (!paymentId || !manualTxId) {
+    // 2. Validation stricte du format des données d'entrée
+    if (!paymentId || typeof paymentId !== 'string') {
       return NextResponse.json(
-        { error: 'Les champs "paymentId" et "manualTxId" sont requis.' },
+        { error: 'Le champ "paymentId" est requis et doit être valide.' },
         { status: 400 }
       );
     }
 
-    // Récupération et vérification de la validité du paiement (par id ou token)
+    const cleanPaymentId = paymentId.trim();
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleanPaymentId)) {
+      return NextResponse.json(
+        { error: 'Format d\'identifiant de paiement invalide.' },
+        { status: 400 }
+      );
+    }
+
+    if (!manualTxId || typeof manualTxId !== 'string') {
+      return NextResponse.json(
+        { error: 'Le champ "manualTxId" est requis.' },
+        { status: 400 }
+      );
+    }
+
+    // Assainissement de la référence (longueur max 64, caractères alphanumériques et séparateurs usuels)
+    const sanitizedTxId = manualTxId.trim().replace(/[^a-zA-Z0-9_\-\.\:\/]/g, '').slice(0, 64);
+    if (sanitizedTxId.length < 3) {
+      return NextResponse.json(
+        { error: 'La référence de transaction SMS doit comporter au moins 3 caractères valides.' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Récupération et vérification de la validité du paiement (par id ou token)
     let { data: payment, error: fetchError } = await supabaseAdmin
       .from('payments')
       .select('*')
-      .eq('id', paymentId)
+      .eq('id', cleanPaymentId)
       .maybeSingle();
 
     if (!payment) {
@@ -81,7 +140,7 @@ export async function POST(request) {
         const tokenRes = await supabaseAdmin
           .from('payments')
           .select('*')
-          .eq('token', paymentId)
+          .eq('token', cleanPaymentId)
           .maybeSingle();
         if (tokenRes.data) {
           payment = tokenRes.data;
@@ -119,15 +178,15 @@ export async function POST(request) {
       );
     }
 
-    // Mise à jour de la référence manuelle et bascule en 'a_verifier'
+    // 4. Mise à jour de la référence manuelle et bascule en 'a_verifier'
     const { error: updateError } = await supabaseAdmin
       .from('payments')
       .update({
-        manual_tx_id: String(manualTxId).trim(),
+        manual_tx_id: sanitizedTxId,
         status: 'a_verifier',
         updated_at: now.toISOString(),
       })
-      .eq('id', paymentId);
+      .eq('id', payment.id);
 
     if (updateError) {
       console.error('[Manual-Verify POST] Erreur mise à jour :', updateError);
@@ -151,13 +210,24 @@ export async function POST(request) {
 }
 
 /**
- * PATCH /api/manual-verify (ADMINISTRATEUR)
- * Endpoint de décision pour l'administrateur en mode secours :
- * - action: 'validate' -> Passe en 'paye', verrouille l'usage unique, transmet le reçu officiel.
- * - action: 'reject'   -> Passe en 'echoue'.
+ * PATCH /api/manual-verify (ADMINISTRATEUR SEULEMENT)
+ * Sécurisé : Nécessite impérativement une session active pour valider ou rejeter.
  */
 export async function PATCH(request) {
   try {
+    // 1. Contrôle d'accès strict : Vérification de la session administrateur
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Accès non autorisé. Session administrateur requise pour valider un paiement.' },
+        { status: 401 }
+      );
+    }
+
     let body;
     try {
       body = await request.json();
@@ -174,7 +244,15 @@ export async function PATCH(request) {
       );
     }
 
-    const normalizedAction = action.toLowerCase().trim();
+    const cleanPaymentId = String(paymentId).trim();
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleanPaymentId)) {
+      return NextResponse.json(
+        { error: 'Identifiant de paiement invalide.' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedAction = String(action).toLowerCase().trim();
     if (!['validate', 'approve', 'reject', 'refuse'].includes(normalizedAction)) {
       return NextResponse.json(
         { error: 'Action non reconnue. Utilisez "validate" ou "reject".' },
@@ -182,11 +260,11 @@ export async function PATCH(request) {
       );
     }
 
-    // 1. Récupération des données du paiement
+    // 2. Récupération des données du paiement
     const { data: payment, error: fetchErr } = await supabaseAdmin
       .from('payments')
       .select('*, client:clients(*)')
-      .eq('id', paymentId)
+      .eq('id', cleanPaymentId)
       .single();
 
     if (fetchErr || !payment) {
@@ -195,19 +273,19 @@ export async function PATCH(request) {
 
     const nowIso = new Date().toISOString();
 
-    // 2. Décision ADMINISTRATEUR : VALIDATION
+    // 3. Décision ADMINISTRATEUR : VALIDATION
     if (normalizedAction === 'validate' || normalizedAction === 'approve') {
       const isSingleUse = payment.is_single_use !== false;
       const currentTimesUsed = Number(payment.times_used) || 0;
       const newTimesUsed = currentTimesUsed + 1;
 
       const baseUpdate = {
-        status: 'paye', // Statut officiel payé
+        status: 'paye',
         payment_method: payment.payment_method || 'manuel_mobile_money',
         updated_at: nowIso,
       };
 
-      // Tentative avec champs de verrouillage étendus (times_used, paid_at)
+      // Tentative avec champs étendus
       let { data: updated, error: updateErr } = await supabaseAdmin
         .from('payments')
         .update({
@@ -215,17 +293,17 @@ export async function PATCH(request) {
           times_used: newTimesUsed,
           paid_at: nowIso,
         })
-        .eq('id', paymentId)
+        .eq('id', cleanPaymentId)
         .select('*, client:clients(*)')
         .single();
 
-      // Repli si les colonnes étendues n'existent pas encore
+      // Repli si colonnes étendues non présentes
       if (updateErr && updateErr.message && (updateErr.message.includes('column') || updateErr.message.includes('schema cache'))) {
         console.warn('[Manual-Verify PATCH] Repli sur colonnes standards :', updateErr.message);
         const retry = await supabaseAdmin
           .from('payments')
           .update(baseUpdate)
-          .eq('id', paymentId)
+          .eq('id', cleanPaymentId)
           .select('*, client:clients(*)')
           .single();
         updated = retry.data;
@@ -243,18 +321,20 @@ export async function PATCH(request) {
       // Enregistrement d'un log d'audit dans webhook_logs pour traçabilité
       try {
         await supabaseAdmin.from('webhook_logs').insert({
-          event_id: `admin_manual_validate_${paymentId}_${Date.now()}`,
+          event_id: `admin_manual_validate_${cleanPaymentId}_${Date.now()}`,
           payload: {
-            payment_id: paymentId,
+            payment_id: cleanPaymentId,
+            admin_user_id: session.user.id,
+            admin_email: session.user.email,
             action: 'manual_validation',
             manual_tx_id: payment.manual_tx_id,
-            admin_note: adminNote || null,
+            admin_note: adminNote ? String(adminNote).slice(0, 500) : null,
             validated_at: nowIso,
           },
           status: 'admin_validated',
         });
       } catch (logErr) {
-        console.warn('[Manual-Verify PATCH] Log audit webhook non bloquant :', logErr.message);
+        console.warn('[Manual-Verify PATCH] Log audit non bloquant :', logErr.message);
       }
 
       // Déclenchement automatique de l'envoi du reçu par email si disponible
@@ -274,7 +354,7 @@ export async function PATCH(request) {
         console.warn('[Manual-Verify PATCH] Envoi reçu non bloquant :', emailErr.message);
       }
 
-      console.info(`[Manual-Verify - Admin] Paiement ${paymentId} validé manuellement avec succès.`);
+      console.info(`[Manual-Verify - Admin] Paiement ${cleanPaymentId} validé par ${session.user.email}`);
 
       return NextResponse.json(
         {
@@ -287,7 +367,7 @@ export async function PATCH(request) {
       );
     }
 
-    // 3. Décision ADMINISTRATEUR : REFUS / REJET
+    // 4. Décision ADMINISTRATEUR : REFUS / REJET
     if (normalizedAction === 'reject' || normalizedAction === 'refuse') {
       const { data: updated, error: updateErr } = await supabaseAdmin
         .from('payments')
@@ -295,7 +375,7 @@ export async function PATCH(request) {
           status: 'echoue',
           updated_at: nowIso,
         })
-        .eq('id', paymentId)
+        .eq('id', cleanPaymentId)
         .select()
         .single();
 
@@ -310,21 +390,23 @@ export async function PATCH(request) {
       // Traçabilité d'audit dans webhook_logs
       try {
         await supabaseAdmin.from('webhook_logs').insert({
-          event_id: `admin_manual_reject_${paymentId}_${Date.now()}`,
+          event_id: `admin_manual_reject_${cleanPaymentId}_${Date.now()}`,
           payload: {
-            payment_id: paymentId,
+            payment_id: cleanPaymentId,
+            admin_user_id: session.user.id,
+            admin_email: session.user.email,
             action: 'manual_rejection',
             manual_tx_id: payment.manual_tx_id,
-            admin_note: adminNote || null,
+            admin_note: adminNote ? String(adminNote).slice(0, 500) : null,
             rejected_at: nowIso,
           },
           status: 'admin_rejected',
         });
       } catch (logErr) {
-        console.warn('[Manual-Verify PATCH] Log audit webhook non bloquant :', logErr.message);
+        console.warn('[Manual-Verify PATCH] Log audit non bloquant :', logErr.message);
       }
 
-      console.info(`[Manual-Verify - Admin] Paiement ${paymentId} rejeté.`);
+      console.info(`[Manual-Verify - Admin] Paiement ${cleanPaymentId} rejeté par ${session.user.email}`);
 
       return NextResponse.json(
         {

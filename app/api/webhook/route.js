@@ -60,8 +60,15 @@ export async function POST(request) {
         );
       }
     } else {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[Webhook] ERREUR CRITIQUE : GENIUSPAY_WEBHOOK_SECRET absent en production.');
+        return NextResponse.json(
+          { error: 'Configuration serveur incomplète pour les webhooks.' },
+          { status: 500 }
+        );
+      }
       console.warn(
-        '[Webhook] AVERTISSEMENT : GENIUSPAY_WEBHOOK_SECRET non configuré. Signature ignorée.'
+        '[Webhook] AVERTISSEMENT : GENIUSPAY_WEBHOOK_SECRET non configuré (mode développement). Signature ignorée.'
       );
     }
 
@@ -146,10 +153,19 @@ export async function POST(request) {
 
     if (!paymentId) {
       console.warn('[Webhook] Aucun payment_id exploitable trouvé.');
-      // Enregistrement du log comme ignoré
       await logWebhookEvent(eventId, payload, 'ignored_missing_payment_id');
       return NextResponse.json(
         { received: true, status: 'ignored_missing_payment_id', event_id: eventId },
+        { status: 200 }
+      );
+    }
+
+    const cleanPaymentId = String(paymentId).trim();
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleanPaymentId)) {
+      console.warn('[Webhook] Format de payment_id invalide :', paymentId);
+      await logWebhookEvent(eventId, payload, 'ignored_invalid_payment_id');
+      return NextResponse.json(
+        { received: true, status: 'ignored_invalid_payment_id', event_id: eventId },
         { status: 200 }
       );
     }
@@ -175,7 +191,7 @@ export async function POST(request) {
       const { data: currentPayment, error: fetchErr } = await supabaseAdmin
         .from('payments')
         .select('*')
-        .eq('id', paymentId)
+        .eq('id', cleanPaymentId)
         .single();
 
       if (fetchErr || !currentPayment) {
@@ -190,7 +206,7 @@ export async function POST(request) {
 
       // Si le paiement est à usage unique et déjà payé, garantir l'idempotence
       if (isSingleUse && currentPayment.status === 'paye' && currentTimesUsed >= 1) {
-        console.info(`[Webhook - Idempotence] Le paiement ${paymentId} est déjà finalisé.`);
+        console.info(`[Webhook - Idempotence] Le paiement ${cleanPaymentId} est déjà finalisé.`);
         await logWebhookEvent(eventId, payload, 'already_paid');
         return NextResponse.json(
           { received: true, status: 'already_paid', event_id: eventId },
@@ -216,7 +232,7 @@ export async function POST(request) {
           times_used: newTimesUsed,
           paid_at: nowIso,
         })
-        .eq('id', paymentId)
+        .eq('id', cleanPaymentId)
         .select()
         .single();
 
@@ -226,7 +242,7 @@ export async function POST(request) {
         const retry = await supabaseAdmin
           .from('payments')
           .update(baseUpdatePayload)
-          .eq('id', paymentId)
+          .eq('id', cleanPaymentId)
           .select()
           .single();
         updated = retry.data;
@@ -272,14 +288,14 @@ export async function POST(request) {
       await logWebhookEvent(eventId, payload, 'processed_success');
 
       console.info(
-        `[Webhook - Succès] Paiement ${paymentId} validé avec succès (${provider}). Lien verrouillé (usage ${newTimesUsed}/${maxUses}).`
+        `[Webhook - Succès] Paiement ${cleanPaymentId} validé avec succès (${provider}). Lien verrouillé (usage ${newTimesUsed}/${maxUses}).`
       );
 
       return NextResponse.json(
         {
           received: true,
           status: 'success',
-          payment_id: paymentId,
+          payment_id: cleanPaymentId,
           event_id: eventId,
           times_used: newTimesUsed,
         },
@@ -296,14 +312,14 @@ export async function POST(request) {
           payment_method: provider,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', paymentId)
+        .eq('id', cleanPaymentId)
         .neq('status', 'paye'); // Ne jamais écraser un statut 'paye' existant
 
       await logWebhookEvent(eventId, payload, 'processed_failure');
 
-      console.info(`[Webhook - Échec] Paiement ${paymentId} marqué échoué.`);
+      console.info(`[Webhook - Échec] Paiement ${cleanPaymentId} marqué échoué.`);
       return NextResponse.json(
-        { received: true, status: 'failed', payment_id: paymentId, event_id: eventId },
+        { received: true, status: 'failed', payment_id: cleanPaymentId, event_id: eventId },
         { status: 200 }
       );
     }

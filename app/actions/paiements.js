@@ -3,90 +3,89 @@
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getFeeSettings, calculatePaymentAmounts } from "@/lib/pricing";
 
+/**
+ * Server Action: creerLienPaiement
+ * Sécurisée : Vérifie la session active avant toute opération en base.
+ */
 export async function creerLienPaiement(formData) {
-    const nom = formData.get("nom");
-    const telephone = formData.get("telephone");
-    const email = formData.get("email") || null;
-    const service = formData.get("service");
-    const montantNet = Number(formData.get("montant_net"));
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
-    // 1. Calcul des frais : 1% + 100 XOF supportés par le client
-    const montantTotal = Math.ceil((montantNet + 100) / (1 - 0.01));
+  // 1. Contrôle d'accès : Session requise
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+  if (!session) {
+    throw new Error("Action non autorisée : Vous devez être connecté.");
+  }
 
-    try {
-        // 2. Appel de l'API GeniusPay (selon la documentation officielle de checkout)
-        const geniusPayRes = await fetch("https://geniuspay.ci/api/v1/merchant/payments", {
-            method: "POST",
-            headers: {
-                "X-API-Key": process.env.GENIUSPAY_API_KEY,
-                "X-API-Secret": process.env.GENIUSPAY_API_SECRET,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                amount: montantTotal,
-                description: service,
-                customer: {
-                    name: nom,
-                    phone: telephone,
-                    email: email,
-                },
-            }),
-        });
+  const nom = String(formData.get("nom") || "").trim().slice(0, 100);
+  const telephone = String(formData.get("telephone") || "").trim().slice(0, 30);
+  const email = formData.get("email") ? String(formData.get("email")).trim().slice(0, 100) : null;
+  const service = String(formData.get("service") || "").trim().slice(0, 150);
+  const montantNet = Number(formData.get("montant_net"));
 
-        const geniusData = await geniusPayRes.json();
+  if (!nom || !telephone || !service || isNaN(montantNet) || montantNet <= 0) {
+    throw new Error("Tous les champs obligatoires doivent être renseignés avec des valeurs valides.");
+  }
 
-        if (!geniusData.success) {
-            throw new Error(geniusData.error?.message || "Erreur lors de l'initialisation GeniusPay");
-        }
+  // 2. Calcul des frais selon la formule officielle
+  const feeSettings = await getFeeSettings();
+  const calculated = calculatePaymentAmounts(montantNet, {
+    rate: feeSettings.rate,
+    fixedFee: feeSettings.fixedFee,
+    feeBearer: "client",
+  });
 
-        // Récupération de l'URL de checkout et de la référence unique (ex: MTX-...)
-        const checkoutUrl = geniusData.data.checkout_url || geniusData.data.payment_url;
-        const paymentReference = geniusData.data.reference;
+  const montantTotal = calculated.total_amount;
 
-        // 3. Gestion du client dans Supabase
-        let clientId;
-        const { data: existingClient } = await supabase
-            .from("clients")
-            .select("id")
-            .eq("telephone", telephone)
-            .single();
+  try {
+    // 3. Gestion du client dans Supabase
+    let clientId;
+    const { data: existingClient } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("phone", telephone)
+      .maybeSingle();
 
-        if (existingClient) {
-            clientId = existingClient.id;
-        } else {
-            const { data: newClient, error: clientError } = await supabase
-                .from("clients")
-                .insert([{ nom, telephone, email }])
-                .select("id")
-                .single();
+    if (existingClient?.id) {
+      clientId = existingClient.id;
+    } else {
+      const { data: newClient, error: clientError } = await supabase
+        .from("clients")
+        .insert([{ name: nom, phone: telephone, email }])
+        .select("id")
+        .single();
 
-            if (clientError) throw clientError;
-            clientId = newClient.id;
-        }
-
-        // 4. Enregistrement du paiement avec la vraie URL GeniusPay
-        const { error: paymentError } = await supabase.from("paiements").insert([
-            {
-                client_id: clientId,
-                service,
-                montant_net: montantNet,
-                montant_total: montantTotal,
-                statut: "en_attente",
-                geniuspay_url: checkoutUrl,
-                geniuspay_id: paymentReference,
-            },
-        ]);
-
-        if (paymentError) throw paymentError;
-
-    } catch (err) {
-        console.error("Erreur backend création paiement:", err);
-        throw new Error(err.message);
+      if (clientError) throw clientError;
+      clientId = newClient.id;
     }
 
-    redirect("/dashboard");
+    // 4. Enregistrement du paiement
+    const paymentId = crypto.randomUUID();
+    const { error: paymentError } = await supabase.from("payments").insert([
+      {
+        id: paymentId,
+        client_id: clientId,
+        service_name: service,
+        amount_net: montantNet,
+        amount_total: montantTotal,
+        fee_amount: calculated.fee_amount,
+        status: "en_attente",
+        is_single_use: true,
+        max_uses: 1,
+        times_used: 0,
+      },
+    ]);
+
+    if (paymentError) throw paymentError;
+  } catch (err) {
+    console.error("Erreur serveur création paiement :", err);
+    throw new Error(err.message || "Erreur interne.");
+  }
+
+  redirect("/dashboard");
 }

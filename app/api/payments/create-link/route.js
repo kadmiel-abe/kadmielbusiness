@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getFeeSettings, calculatePaymentAmounts } from '@/lib/pricing';
 
@@ -7,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Route POST /api/payments/create-link
+ * Sécurisée : Nécessite une session administrateur active.
  * Crée un client (ou réutilise un existant) et insère le paiement dans Supabase.
  * Calcule et garantit le respect de la formule officielle GeniusPay côté serveur :
  * total_amount = Math.ceil((net_amount + fixed_fee) / (1 - rate))
@@ -14,14 +17,35 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request) {
   try {
-    const body = await request.json();
+    // 1. Contrôle d'accès strict : Vérification de la session administrateur
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Session non authentifiée. Vous devez être connecté pour générer un lien de paiement.' },
+        { status: 401 }
+      );
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Corps de requête JSON invalide.' },
+        { status: 400 }
+      );
+    }
+
     const {
       id,
       client_name,
       client_phone,
       service_name,
       amount_net,
-      amount_total,
       expires_at,
       is_single_use,
       max_uses,
@@ -29,17 +53,51 @@ export async function POST(request) {
       business_type,
     } = body || {};
 
-    if (!client_name || !client_phone || !service_name || !amount_net) {
+    // 2. Validation et assainissement stricts des entrées
+    if (!client_name || typeof client_name !== 'string' || !client_name.trim()) {
       return NextResponse.json(
-        { error: 'Tous les champs obligatoires (nom, téléphone, prestation, montant net) doivent être renseignés.' },
+        { error: 'Le nom du client est obligatoire.' },
         { status: 400 }
       );
     }
 
-    // 1. Recherche ou création du client dans la table `clients`
-    let clientId = null;
-    const cleanPhone = client_phone.trim();
+    if (!client_phone || typeof client_phone !== 'string' || !client_phone.trim()) {
+      return NextResponse.json(
+        { error: 'Le numéro de téléphone du client est obligatoire.' },
+        { status: 400 }
+      );
+    }
 
+    if (!service_name || typeof service_name !== 'string' || !service_name.trim()) {
+      return NextResponse.json(
+        { error: 'Le libellé de la prestation ou du plat est obligatoire.' },
+        { status: 400 }
+      );
+    }
+
+    const cleanNet = Number(amount_net);
+    if (isNaN(cleanNet) || cleanNet <= 0 || cleanNet > 100000000) {
+      return NextResponse.json(
+        { error: 'Le montant net doit être un nombre strictement positif et raisonnable (FCFA).' },
+        { status: 400 }
+      );
+    }
+
+    const cleanName = client_name.trim().slice(0, 100);
+    const cleanPhone = client_phone.trim().slice(0, 30);
+    const cleanService = service_name.trim().slice(0, 150);
+
+    // Validation optionnelle de l'identifiant personnalisé
+    let paymentId = crypto.randomUUID();
+    if (id && typeof id === 'string') {
+      const trimmedId = id.trim();
+      if (/^[a-zA-Z0-9_-]{1,64}$/.test(trimmedId)) {
+        paymentId = trimmedId;
+      }
+    }
+
+    // 3. Recherche ou création du client dans la table `clients`
+    let clientId = null;
     if (cleanPhone) {
       const { data: existing } = await supabaseAdmin
         .from('clients')
@@ -56,7 +114,7 @@ export async function POST(request) {
       const { data: createdClient, error: clientErr } = await supabaseAdmin
         .from('clients')
         .insert({
-          name: client_name.trim(),
+          name: cleanName,
           phone: cleanPhone,
         })
         .select('id')
@@ -64,16 +122,15 @@ export async function POST(request) {
 
       if (clientErr) {
         console.error('[CreateLink API] Erreur création client :', clientErr);
-        // Fallback sans bloquer si la création client échoue
       } else {
         clientId = createdClient?.id;
       }
     }
 
-    // 2. Traitement des frais selon la formule officielle GeniusPay
+    // 4. Traitement des frais selon la formule officielle GeniusPay
     const feeSettings = await getFeeSettings();
     const computedFeeBearer = fee_bearer === 'freelance' ? 'freelance' : 'client';
-    const calculated = calculatePaymentAmounts(amount_net, {
+    const calculated = calculatePaymentAmounts(cleanNet, {
       rate: feeSettings.rate,
       fixedFee: feeSettings.fixedFee,
       feeBearer: computedFeeBearer,
@@ -88,12 +145,11 @@ export async function POST(request) {
     const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
     const computedBusinessType = business_type === 'restaurant' ? 'restaurant' : 'freelance';
 
-    // 3. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
-    const paymentId = id || crypto.randomUUID();
+    // 5. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
     const fullPayload = {
       id: paymentId,
       client_id: clientId,
-      service_name: service_name.trim(),
+      service_name: cleanService,
       amount_net: finalAmountNet,
       amount_total: finalAmountTotal,
       fee_amount: finalFeeAmount,
@@ -112,15 +168,15 @@ export async function POST(request) {
       .select('*, client:clients(*)')
       .single();
 
-    // Si les colonnes étendues n'ont pas encore été créées dans Supabase, repli gracieux
+    // Repli résilient si colonnes étendues non migrées
     if (payErr && payErr.message && (payErr.message.includes('column') || payErr.message.includes('schema cache'))) {
       console.warn('[CreateLink API] Repli résilient sur les colonnes de base :', payErr.message);
       const basePayload = {
         id: paymentId,
         client_id: clientId,
-        service_name: service_name.trim(),
-        amount_net: Number(amount_net),
-        amount_total: Number(amount_total),
+        service_name: cleanService,
+        amount_net: finalAmountNet,
+        amount_total: finalAmountTotal,
         status: 'en_attente',
       };
       const retry = await supabaseAdmin
