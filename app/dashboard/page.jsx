@@ -792,12 +792,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Ligne 2 : Sélecteur de Période Élargi & Déroulé (Tous les 5 boutons 100% visibles sans aucune coupure) */}
+        {/* Ligne 2 : Sélecteur de Période Élargi & Déroulé (100% tactile et réactif) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
           <div className="flex flex-col gap-2.5 w-full sm:w-auto">
-            {/* Conteneur élargi des filtres temporels */}
-            <div className="inline-flex items-center gap-2.5 px-6 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-fit max-w-full">
-              <span className="text-emerald-400 shrink-0 mr-1.5 flex items-center">
+            {/* Conteneur élargi des filtres temporels avec scroll horizontal doux */}
+            <div className="inline-flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-6 py-2 sm:py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-full sm:w-fit max-w-full">
+              <span className="text-emerald-400 shrink-0 mr-1 flex items-center">
                 <CalendarDays className="h-4 w-4" />
               </span>
 
@@ -814,7 +814,7 @@ export default function DashboardPage() {
                     key={id}
                     type="button"
                     onClick={() => setPeriodPreset(id)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
                       active
                         ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
                         : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
@@ -828,14 +828,14 @@ export default function DashboardPage() {
 
             {/* Champs Date début & Date fin affichés quand "Personnalisé" est sélectionné */}
             {periodPreset === "custom" && (
-              <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 animate-slide-up text-xs flex-wrap shadow-lg w-fit">
+              <div className="inline-flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-6 py-2 sm:py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 animate-slide-up text-xs flex-wrap shadow-lg w-full sm:w-fit">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-zinc-400">Du</span>
                   <input
                     type="date"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
+                    className="h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -844,7 +844,7 @@ export default function DashboardPage() {
                     type="date"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
+                    className="h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
                   />
                 </div>
                 {(customStartDate || customEndDate) && (
@@ -895,23 +895,23 @@ export default function DashboardPage() {
       {/* ═══ Indicateurs clés (KPIs) ═══ */}
       <section
         aria-label="Indicateurs clés"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
       >
         {kpiCards.map(
           ({ label, value, note, icon: Icon, color, bg, progress, badge, badgeCustomClass }) => (
             <article
               key={label}
-              className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 relative overflow-hidden hover:border-emerald-500/40 transition-colors shadow-lg"
+              className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-4 sm:p-5 relative overflow-hidden hover:border-emerald-500/40 transition-colors shadow-lg min-w-0"
             >
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-medium text-zinc-400">{label}</p>
-                <span className={`rounded-xl p-2.5 ${bg} ${color}`}>
+                <p className="text-xs sm:text-sm font-medium text-zinc-400">{label}</p>
+                <span className={`rounded-xl p-2 sm:p-2.5 ${bg} ${color} shrink-0`}>
                   <Icon className="h-4 w-4" />
                 </span>
               </div>
 
-              <div className="mt-4 flex items-baseline gap-2">
-                <p className="text-2xl font-bold tracking-tight text-white">
+              <div className="mt-3 sm:mt-4 flex flex-wrap items-baseline gap-2">
+                <p className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   {value}
                 </p>
                 {badge && (
@@ -927,7 +927,7 @@ export default function DashboardPage() {
               </div>
 
               {progress !== undefined && (
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
+                <div className="mt-3 sm:mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
                   <div
                     className="h-full rounded-full bg-emerald-500 transition-all"
                     style={{ width: `${progress}%` }}
@@ -943,9 +943,9 @@ export default function DashboardPage() {
       {/* ═══ SECTION : PILOTAGE & RÉPARTITION MOBILE MONEY (WAVE, ORANGE, MTN, MOOV) ═══ */}
       <section
         aria-label="Répartition des opérateurs Mobile Money"
-        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 sm:p-6 shadow-xl space-y-5"
+        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-900">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-4 border-b border-zinc-900">
           <div>
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -962,7 +962,7 @@ export default function DashboardPage() {
 
           <Link
             href="/analytics"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition shrink-0 group self-start sm:self-auto"
+            className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition shrink-0 group self-start sm:self-auto"
           >
             <span>Cockpit d&apos;analyse complet</span>
             <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -970,14 +970,14 @@ export default function DashboardPage() {
         </div>
 
         {/* Grille des 4 opérateurs Mobile Money avec jauges de progression */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {operatorBreakdown.map((op) => (
             <div
               key={op.code}
-              className="p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/70 hover:border-emerald-500/30 transition"
+              className="p-3.5 sm:p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/70 hover:border-emerald-500/30 transition min-w-0"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <span
                     className="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm"
                     style={{ backgroundColor: op.color }}
@@ -986,12 +986,12 @@ export default function DashboardPage() {
                     {op.label}
                   </span>
                 </div>
-                <span className="text-[11px] font-extrabold text-emerald-400">
+                <span className="text-[11px] font-extrabold text-emerald-400 shrink-0">
                   {op.percentage}% du CA
                 </span>
               </div>
 
-              <p className="text-lg font-black text-white">
+              <p className="text-base sm:text-lg font-black text-white">
                 {formatAmount(op.amount)}
               </p>
 
@@ -1019,7 +1019,7 @@ export default function DashboardPage() {
 
       {/* ═══ Graphiques et Répartitions ═══ */}
       <section aria-label="Analyses" className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 shadow-lg">
+        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-4 sm:p-5 shadow-lg min-w-0">
           <div className="mb-5">
             <h2 className="font-semibold text-white">Répartition des Services</h2>
             <p className="mt-1 text-xs text-zinc-500">
@@ -1087,7 +1087,7 @@ export default function DashboardPage() {
           )}
         </article>
 
-        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 shadow-lg">
+        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-4 sm:p-5 shadow-lg min-w-0">
           <div className="mb-5">
             <h2 className="font-semibold text-white">Évolution des Revenus</h2>
             <p className="mt-1 text-xs text-zinc-500">
@@ -1175,7 +1175,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
               {/* Barre de Recherche Instantanée */}
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
@@ -1216,7 +1216,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Onglets de Filtres de Statut */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
             <span className="text-[11px] text-zinc-400 flex items-center gap-1 mr-1 shrink-0">
               <Filter className="h-3 w-3 text-emerald-400" />
               Statut :
@@ -1283,70 +1283,356 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tableau */}
+        {/* Tableau Desktop + Cartes Mobiles */}
         {filteredTransactions.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[840px] text-left text-sm">
-              <thead className="border-b border-white/5 bg-white/[0.02] text-[11px] uppercase tracking-wider text-zinc-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Client</th>
-                  <th className="px-4 py-3 font-medium">Service</th>
-                  <th className="px-4 py-3 font-medium">Montant Total</th>
-                  <th className="px-4 py-3 font-medium">Statut & Référence</th>
-                  <th className="px-5 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredTransactions.map((tx) => {
-                  const name = clientName(tx);
-                  const phone = clientPhone(tx);
-                  const initials =
-                    name
-                      .split(/\s+/)
-                      .slice(0, 2)
-                      .map((part) => part[0])
-                      .join("")
-                      .toUpperCase() || "?";
+          <>
+            {/* Version Desktop : Tableau complet avec scroll horizontal */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[840px] text-left text-sm">
+                <thead className="border-b border-white/5 bg-white/[0.02] text-[11px] uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Client</th>
+                    <th className="px-4 py-3 font-medium">Service</th>
+                    <th className="px-4 py-3 font-medium">Montant Total</th>
+                    <th className="px-4 py-3 font-medium">Statut & Référence</th>
+                    <th className="px-5 py-3 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredTransactions.map((tx) => {
+                    const name = clientName(tx);
+                    const phone = clientPhone(tx);
+                    const initials =
+                      name
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((part) => part[0])
+                        .join("")
+                        .toUpperCase() || "?";
 
-                  const isPaid = txIsPaid(tx);
-                  const isPending = txIsPending(tx);
-                  const isToVerify = txIsToVerify(tx);
-                  const isExpired = txIsExpired(tx);
-                  const service = txService(tx);
-                  const total = txAmountTotal(tx);
-                  const net = txAmountNet(tx);
+                    const isPaid = txIsPaid(tx);
+                    const isPending = txIsPending(tx);
+                    const isToVerify = txIsToVerify(tx);
+                    const isExpired = txIsExpired(tx);
+                    const service = txService(tx);
+                    const total = txAmountTotal(tx);
+                    const net = txAmountNet(tx);
 
-                  return (
-                    <tr
-                      key={tx.id}
-                      className={`transition-colors ${
-                        isToVerify
-                          ? "bg-amber-500/5 hover:bg-amber-500/10"
-                          : "hover:bg-white/[0.02]"
-                      }`}
-                    >
-                      {/* Client */}
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-[10px] font-bold text-zinc-300 border border-white/5">
-                            {initials}
-                          </span>
-                          <div>
-                            <p className="whitespace-nowrap text-xs font-semibold text-zinc-100">
-                              {name}
-                            </p>
-                            <p className="mt-0.5 text-[10px] text-zinc-500 font-mono">
-                              {phone || "Téléphone non renseigné"}
-                            </p>
+                    return (
+                      <tr
+                        key={tx.id}
+                        className={`transition-colors ${
+                          isToVerify
+                            ? "bg-amber-500/5 hover:bg-amber-500/10"
+                            : "hover:bg-white/[0.02]"
+                        }`}
+                      >
+                        {/* Client */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-[10px] font-bold text-zinc-300 border border-white/5">
+                              {initials}
+                            </span>
+                            <div>
+                              <p className="whitespace-nowrap text-xs font-semibold text-zinc-100">
+                                {name}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-zinc-500 font-mono">
+                                {phone || "Téléphone non renseigné"}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Service */}
-                      <td className="px-4 py-3.5 text-xs text-zinc-300">
-                        <span className="font-medium text-white">{service}</span>
+                        {/* Service */}
+                        <td className="px-4 py-3.5 text-xs text-zinc-300">
+                          <span className="font-medium text-white">{service}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-[10px] text-zinc-500">
+                              Net : {formatAmount(net)}
+                            </span>
+                            {tx.fee_bearer === "freelance" ? (
+                              <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+                                Frais offerts
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-zinc-400 bg-zinc-850 border border-zinc-700/80 px-1.5 py-0.2 rounded">
+                                Frais client
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Montant Total */}
+                        <td className="whitespace-nowrap px-4 py-3.5 text-xs font-bold text-white">
+                          {formatAmount(total)}
+                        </td>
+
+                        {/* Statut & Référence */}
+                        <td className="px-4 py-3.5">
+                          <div className="space-y-1">
+                            {isPaid ? (
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                Payé
+                              </span>
+                            ) : isExpired ? (
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                                Expiré
+                              </span>
+                            ) : isToVerify ? (
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                À vérifier (Secours)
+                              </span>
+                            ) : isPending ? (
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-amber-300/90 border border-amber-400/20">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                En attente
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                                Échoué
+                              </span>
+                            )}
+
+                            {/* Badge Type d'usage & Quota */}
+                            {tx.is_single_use === false ? (
+                              <span className="block text-[10px] text-zinc-400 font-mono">
+                                Multi ({tx.times_used || 0}/{tx.max_uses || 1})
+                              </span>
+                            ) : (
+                              <span className="block text-[10px] text-zinc-500">
+                                Usage unique
+                              </span>
+                            )}
+
+                            {/* ID SMS saisi par le client */}
+                            {tx.manual_tx_id && (
+                              <p className="text-[10px] font-mono text-amber-300 font-semibold flex items-center gap-1">
+                                <span>SMS ID:</span>
+                                <span className="bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.2 rounded">
+                                  {tx.manual_tx_id}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex justify-end items-center gap-1.5">
+                            {/* WhatsApp */}
+                            <button
+                              type="button"
+                              onClick={() => openWhatsApp(tx)}
+                              title={isPaid ? "Remercier sur WhatsApp" : "Relancer sur WhatsApp"}
+                              className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </button>
+
+                            {/* Copier lien */}
+                            <button
+                              type="button"
+                              onClick={() => copyPaymentLink(tx.id)}
+                              title={copiedId === tx.id ? "Lien copié" : "Copier le lien"}
+                              className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+                            >
+                              {copiedId === tx.id ? (
+                                <Check className="h-4 w-4 text-emerald-400" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </button>
+
+                            {/* Ouvrir la facture client */}
+                            <a
+                              href={`/pay/${tx.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Voir la page de paiement"
+                              className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+
+                            {/* Actions Reçu Automatique (si payé) */}
+                            {isPaid && (
+                              <>
+                                {/* Voir le reçu officiel en ligne */}
+                                <Link
+                                  href={`/receipt/${tx.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Consulter le reçu certifié dématérialisé"
+                                  className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
+                                >
+                                  <ReceiptText className="h-4 w-4 text-emerald-400" />
+                                </Link>
+
+                                {/* Envoyer le reçu par email en 1 clic */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendReceiptEmail(tx)}
+                                  title="Envoyer automatiquement le reçu par email"
+                                  className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
+                                >
+                                  <Mail className="h-4 w-4 text-emerald-400" />
+                                </button>
+
+                                {/* Télécharger Reçu PDF (optionnel) */}
+                                <button
+                                  type="button"
+                                  onClick={() => generateReceiptPDF(tx)}
+                                  title="Télécharger le reçu officiel PDF"
+                                  className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+
+                            {/* Validation Manuelle (si non payé) */}
+                            {!isPaid && (
+                              <button
+                                type="button"
+                                onClick={() => updatePaymentStatus(tx, "paye")}
+                                disabled={updatingId === tx.id || deletingId === tx.id}
+                                title="Valider manuellement le paiement"
+                                className="rounded-lg p-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition font-bold disabled:opacity-50"
+                              >
+                                {updatingId === tx.id ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
+
+                            {/* Bouton de suppression de lien — JUSTE À CÔTÉ DU BOUTON VALIDER */}
+                            <button
+                              type="button"
+                              onClick={() => deletePaymentLink(tx)}
+                              disabled={deletingId === tx.id || updatingId === tx.id}
+                              title="Supprimer ce lien de paiement"
+                              className="rounded-lg p-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition disabled:opacity-50"
+                            >
+                              {deletingId === tx.id ? (
+                                <LoaderCircle className="h-4 w-4 animate-spin text-rose-400" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </button>
+
+                            {/* Rejeter (si à vérifier) */}
+                            {isToVerify && (
+                              <button
+                                type="button"
+                                onClick={() => updatePaymentStatus(tx, "echoue")}
+                                disabled={updatingId === tx.id || deletingId === tx.id}
+                                title="Rejeter la référence de secours"
+                                className="rounded-lg p-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold disabled:opacity-50"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Version Mobile-first : Cartes tactiles complètes et ultra-lisibles */}
+            <div className="md:hidden divide-y divide-zinc-800/80">
+              {filteredTransactions.map((tx) => {
+                const name = clientName(tx);
+                const phone = clientPhone(tx);
+                const initials =
+                  name
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join("")
+                    .toUpperCase() || "?";
+
+                const isPaid = txIsPaid(tx);
+                const isPending = txIsPending(tx);
+                const isToVerify = txIsToVerify(tx);
+                const isExpired = txIsExpired(tx);
+                const service = txService(tx);
+                const total = txAmountTotal(tx);
+                const net = txAmountNet(tx);
+
+                return (
+                  <div
+                    key={tx.id}
+                    className={`p-4 space-y-3 transition-colors ${
+                      isToVerify
+                        ? "bg-amber-500/10 border-l-4 border-l-amber-400"
+                        : "hover:bg-zinc-950/60"
+                    }`}
+                  >
+                    {/* Ligne 1 : Client + Statut */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 border border-white/5">
+                          {initials}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate">
+                            {name}
+                          </p>
+                          <p className="text-[11px] text-zinc-400 font-mono truncate">
+                            {phone || "Téléphone non renseigné"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Statut Badge */}
+                      <div className="shrink-0">
+                        {isPaid ? (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            Payé
+                          </span>
+                        ) : isExpired ? (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                            Expiré
+                          </span>
+                        ) : isToVerify ? (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                            À vérifier
+                          </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-amber-300/90 border border-amber-400/20">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                            En attente
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                            Échoué
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ligne 2 : Service & Montant */}
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-900">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-zinc-200 truncate">
+                          {service}
+                        </p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-[10px] text-zinc-500">
+                          <span className="text-[10px] text-zinc-400">
                             Net : {formatAmount(net)}
                           </span>
                           {tx.fee_bearer === "freelance" ? (
@@ -1354,197 +1640,159 @@ export default function DashboardPage() {
                               Frais offerts
                             </span>
                           ) : (
-                            <span className="text-[9px] text-zinc-400 bg-zinc-850 border border-zinc-700/80 px-1.5 py-0.2 rounded">
+                            <span className="text-[9px] text-zinc-400 bg-zinc-850 border border-zinc-750 px-1.5 py-0.2 rounded">
                               Frais client
                             </span>
                           )}
                         </div>
-                      </td>
+                      </div>
 
-                      {/* Montant Total */}
-                      <td className="whitespace-nowrap px-4 py-3.5 text-xs font-bold text-white">
-                        {formatAmount(total)}
-                      </td>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-black text-white">
+                          {formatAmount(total)}
+                        </p>
+                        {tx.is_single_use === false ? (
+                          <span className="text-[9px] text-zinc-400 font-mono">
+                            Multi ({tx.times_used || 0}/{tx.max_uses || 1})
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-zinc-500">Usage unique</span>
+                        )}
+                      </div>
+                    </div>
 
-                      {/* Statut & Référence */}
-                      <td className="px-4 py-3.5">
-                        <div className="space-y-1">
-                          {isPaid ? (
-                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                              Payé
-                            </span>
-                          ) : isExpired ? (
-                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                              Expiré
-                            </span>
-                          ) : isToVerify ? (
-                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                              À vérifier (Secours)
-                            </span>
-                          ) : isPending ? (
-                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-amber-300/90 border border-amber-400/20">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                              En attente
-                            </span>
+                    {/* Ligne 2b : SMS ID si présent */}
+                    {tx.manual_tx_id && (
+                      <div className="flex items-center justify-between text-[10px] bg-amber-950/40 border border-amber-500/20 rounded-lg px-2.5 py-1">
+                        <span className="text-amber-400/90 font-medium">Référence SMS client :</span>
+                        <span className="font-mono font-bold text-amber-300">{tx.manual_tx_id}</span>
+                      </div>
+                    )}
+
+                    {/* Ligne 3 : Barre d'Actions Tactiles */}
+                    <div className="flex items-center justify-between gap-1 pt-2 border-t border-zinc-900/80">
+                      <div className="flex items-center gap-1">
+                        {/* WhatsApp */}
+                        <button
+                          type="button"
+                          onClick={() => openWhatsApp(tx)}
+                          title={isPaid ? "Remercier sur WhatsApp" : "Relancer sur WhatsApp"}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 text-xs font-semibold transition active:scale-95"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          <span className="text-[11px]">WhatsApp</span>
+                        </button>
+
+                        {/* Copier lien */}
+                        <button
+                          type="button"
+                          onClick={() => copyPaymentLink(tx.id)}
+                          title={copiedId === tx.id ? "Lien copié" : "Copier le lien"}
+                          className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white transition active:scale-95"
+                        >
+                          {copiedId === tx.id ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
-                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                              Échoué
-                            </span>
+                            <Copy className="h-3.5 w-3.5" />
                           )}
+                        </button>
 
-                          {/* Badge Type d'usage & Quota */}
-                          {tx.is_single_use === false ? (
-                            <span className="block text-[10px] text-zinc-400 font-mono">
-                              Multi ({tx.times_used || 0}/{tx.max_uses || 1})
-                            </span>
-                          ) : (
-                            <span className="block text-[10px] text-zinc-500">
-                              Usage unique
-                            </span>
-                          )}
+                        {/* Voir page de paiement */}
+                        <a
+                          href={`/pay/${tx.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Voir la page de paiement"
+                          className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white transition active:scale-95"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
 
-                          {/* ID SMS saisi par le client */}
-                          {tx.manual_tx_id && (
-                            <p className="text-[10px] font-mono text-amber-300 font-semibold flex items-center gap-1">
-                              <span>SMS ID:</span>
-                              <span className="bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.2 rounded">
-                                {tx.manual_tx_id}
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      </td>
+                        {/* Reçu si payé */}
+                        {isPaid && (
+                          <>
+                            <Link
+                              href={`/receipt/${tx.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Reçu numérique"
+                              className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition active:scale-95"
+                            >
+                              <ReceiptText className="h-3.5 w-3.5" />
+                            </Link>
 
-                      {/* Actions */}
-                      <td className="px-5 py-3.5">
-                        <div className="flex justify-end items-center gap-1.5">
-                          {/* WhatsApp */}
-                          <button
-                            type="button"
-                            onClick={() => openWhatsApp(tx)}
-                            title={isPaid ? "Remercier sur WhatsApp" : "Relancer sur WhatsApp"}
-                            className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                          </button>
-
-                          {/* Copier lien */}
-                          <button
-                            type="button"
-                            onClick={() => copyPaymentLink(tx.id)}
-                            title={copiedId === tx.id ? "Lien copié" : "Copier le lien"}
-                            className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-                          >
-                            {copiedId === tx.id ? (
-                              <Check className="h-4 w-4 text-emerald-400" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </button>
-
-                          {/* Ouvrir la facture client */}
-                          <a
-                            href={`/pay/${tx.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Voir la page de paiement"
-                            className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-
-                          {/* Actions Reçu Automatique (si payé) */}
-                          {isPaid && (
-                            <>
-                              {/* Voir le reçu officiel en ligne */}
-                              <Link
-                                href={`/receipt/${tx.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Consulter le reçu certifié dématérialisé"
-                                className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
-                              >
-                                <ReceiptText className="h-4 w-4 text-emerald-400" />
-                              </Link>
-
-                              {/* Envoyer le reçu par email en 1 clic */}
-                              <button
-                                type="button"
-                                onClick={() => handleSendReceiptEmail(tx)}
-                                title="Envoyer automatiquement le reçu par email"
-                                className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
-                              >
-                                <Mail className="h-4 w-4 text-emerald-400" />
-                              </button>
-
-                              {/* Télécharger Reçu PDF (optionnel) */}
-                              <button
-                                type="button"
-                                onClick={() => generateReceiptPDF(tx)}
-                                title="Télécharger le reçu officiel PDF"
-                                className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-
-                          {/* Validation Manuelle (si non payé) */}
-                          {!isPaid && (
                             <button
                               type="button"
-                              onClick={() => updatePaymentStatus(tx, "paye")}
-                              disabled={updatingId === tx.id || deletingId === tx.id}
-                              title="Valider manuellement le paiement"
-                              className="rounded-lg p-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition font-bold disabled:opacity-50"
+                              onClick={() => handleSendReceiptEmail(tx)}
+                              title="Envoyer reçu email"
+                              className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition active:scale-95"
                             >
-                              {updatingId === tx.id ? (
-                                <LoaderCircle className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="h-4 w-4" />
-                              )}
+                              <Mail className="h-3.5 w-3.5" />
                             </button>
-                          )}
 
-                          {/* Bouton de suppression de lien — JUSTE À CÔTÉ DU BOUTON VALIDER */}
-                          <button
-                            type="button"
-                            onClick={() => deletePaymentLink(tx)}
-                            disabled={deletingId === tx.id || updatingId === tx.id}
-                            title="Supprimer ce lien de paiement"
-                            className="rounded-lg p-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition disabled:opacity-50"
-                          >
-                            {deletingId === tx.id ? (
-                              <LoaderCircle className="h-4 w-4 animate-spin text-rose-400" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </button>
-
-                          {/* Rejeter (si à vérifier) */}
-                          {isToVerify && (
                             <button
                               type="button"
-                              onClick={() => updatePaymentStatus(tx, "echoue")}
-                              disabled={updatingId === tx.id || deletingId === tx.id}
-                              title="Rejeter la référence de secours"
-                              className="rounded-lg p-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold disabled:opacity-50"
+                              onClick={() => generateReceiptPDF(tx)}
+                              title="Télécharger PDF"
+                              className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white transition active:scale-95"
                             >
-                              <XCircle className="h-4 w-4" />
+                              <FileText className="h-3.5 w-3.5" />
                             </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Actions de validation / suppression */}
+                      <div className="flex items-center gap-1">
+                        {!isPaid && (
+                          <button
+                            type="button"
+                            onClick={() => updatePaymentStatus(tx, "paye")}
+                            disabled={updatingId === tx.id || deletingId === tx.id}
+                            title="Valider paiement"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-black hover:bg-emerald-400 font-extrabold text-[11px] transition active:scale-95 disabled:opacity-50"
+                          >
+                            {updatingId === tx.id ? (
+                              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            )}
+                            <span>Valider</span>
+                          </button>
+                        )}
+
+                        {isToVerify && (
+                          <button
+                            type="button"
+                            onClick={() => updatePaymentStatus(tx, "echoue")}
+                            disabled={updatingId === tx.id || deletingId === tx.id}
+                            title="Rejeter référence"
+                            className="p-1.5 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition active:scale-95 disabled:opacity-50"
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => deletePaymentLink(tx)}
+                          disabled={deletingId === tx.id || updatingId === tx.id}
+                          title="Supprimer ce lien"
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition active:scale-95 disabled:opacity-50"
+                        >
+                          {deletingId === tx.id ? (
+                            <LoaderCircle className="h-3.5 w-3.5 animate-spin text-rose-400" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         ) : (
           <div className="px-5 py-14 text-center">
             <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-zinc-500">

@@ -567,10 +567,84 @@ export default function DashboardLayoutShell({ children }) {
             isDesktopCollapsed ? "md:ml-20" : "md:ml-64"
           }`}
         >
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-[1600px] px-3.5 sm:px-6 lg:px-8 pt-4 pb-28 md:py-8 min-w-0">
             {children}
           </div>
         </main>
+
+        {/* ═════════════════════════════════════════════════════════
+            5. BARRE DE NAVIGATION INFÉRIEURE MOBILE TACTILE (PWA BOTTOM BAR)
+           ═════════════════════════════════════════════════════════ */}
+        <nav
+          aria-label="Navigation principale mobile"
+          className="fixed bottom-0 inset-x-0 z-40 bg-black/95 border-t border-emerald-500/20 backdrop-blur-2xl md:hidden px-2 pt-1.5 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-8px_20px_rgba(0,0,0,0.85)]"
+        >
+          <div className="flex items-center justify-around max-w-md mx-auto">
+            {/* 1. Dashboard */}
+            <Link
+              href="/dashboard"
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+                pathname === "/dashboard"
+                  ? "text-emerald-400 font-extrabold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <LayoutDashboard className={`h-5 w-5 ${pathname === "/dashboard" ? "stroke-[2.5]" : "stroke-2"}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight font-medium">Accueil</span>
+            </Link>
+
+            {/* 2. Analytics */}
+            <Link
+              href="/analytics"
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+                pathname.startsWith("/analytics")
+                  ? "text-emerald-400 font-extrabold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <TrendingUp className={`h-5 w-5 ${pathname.startsWith("/analytics") ? "stroke-[2.5]" : "stroke-2"}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight font-medium">Pilotage</span>
+            </Link>
+
+            {/* 3. Nouveau Lien (Bouton central proéminent avec vert néon #00F06C) */}
+            <Link
+              href="/dashboard/new"
+              aria-label="Créer un nouveau lien de paiement"
+              className="relative -top-3 flex flex-col items-center justify-center group"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00F06C] text-black shadow-lg shadow-emerald-500/40 border-2 border-black group-active:scale-95 transition-transform">
+                <PlusCircle className="h-6 w-6 stroke-[2.8]" />
+              </span>
+              <span className="text-[10px] font-black text-emerald-400 mt-0.5">Nouveau</span>
+            </Link>
+
+            {/* 4. Clients CRM */}
+            <Link
+              href="/clients"
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+                pathname.startsWith("/clients")
+                  ? "text-emerald-400 font-extrabold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Users className={`h-5 w-5 ${pathname.startsWith("/clients") ? "stroke-[2.5]" : "stroke-2"}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight font-medium">Clients</span>
+            </Link>
+
+            {/* 5. Réglages */}
+            <Link
+              href="/settings"
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+                pathname.startsWith("/settings")
+                  ? "text-emerald-400 font-extrabold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Settings2 className={`h-5 w-5 ${pathname.startsWith("/settings") ? "stroke-[2.5]" : "stroke-2"}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight font-medium">Réglages</span>
+            </Link>
+          </div>
+        </nav>
 
         {/* Alerte Toast d'Encaissement Flottante */}
         <PaymentAlertToast />

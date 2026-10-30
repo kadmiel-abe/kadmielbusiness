@@ -401,8 +401,8 @@ export default function ClientsDirectoryPage() {
 
           {/* Filtre de Période Avancé - Élargi & Aéré */}
           <div className="flex flex-col gap-2 w-full lg:w-auto">
-            <div className="inline-flex items-center gap-2.5 px-6 py-2.5 rounded-2xl bg-black border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-fit max-w-full shrink-0">
-              <span className="text-emerald-400 shrink-0 mr-1.5 flex items-center">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-6 py-2 sm:py-2.5 rounded-2xl bg-black border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-full sm:w-fit max-w-full shrink-0">
+              <span className="text-emerald-400 shrink-0 mr-1 flex items-center">
                 <Calendar className="h-4 w-4" />
               </span>
 
@@ -419,7 +419,7 @@ export default function ClientsDirectoryPage() {
                     key={id}
                     type="button"
                     onClick={() => setPeriodPreset(id)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
                       active
                         ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
                         : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"

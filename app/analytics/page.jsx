@@ -287,7 +287,7 @@ export default function AnalyticsDashboardPage() {
           </div>
 
           {/* Boutons d'action : Actualiser + Export CSV */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
             <button
               type="button"
               onClick={() => fetchAnalytics(false)}
@@ -317,7 +317,7 @@ export default function AnalyticsDashboardPage() {
 
         {/* ═══ SÉLECTEUR DE PÉRIODE ÉLARGI (Mobile First) ═══ */}
         <div className="flex flex-col gap-2.5 pt-1">
-          <div className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-fit max-w-full">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-full sm:w-fit max-w-full">
             <span className="text-emerald-400 shrink-0 mr-1 flex items-center">
               <CalendarDays className="h-4 w-4" />
             </span>
@@ -337,7 +337,7 @@ export default function AnalyticsDashboardPage() {
                   key={id}
                   type="button"
                   onClick={() => setPeriodPreset(id)}
-                  className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
+                  className={`px-3 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
                     active
                       ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
@@ -351,7 +351,7 @@ export default function AnalyticsDashboardPage() {
 
           {/* Sélecteur de date début/fin en mode personnalisé */}
           {periodPreset === "custom" && (
-            <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 text-xs flex-wrap shadow-lg w-fit">
+            <div className="inline-flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 text-xs flex-wrap shadow-lg w-full sm:w-fit">
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold text-zinc-400">Du</span>
                 <input
@@ -626,11 +626,11 @@ export default function AnalyticsDashboardPage() {
           </div>
 
           {/* Toggle : Répartition en Montant vs en Volume */}
-          <div className="inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 self-start sm:self-auto text-xs font-semibold">
+          <div className="w-full sm:w-auto inline-flex items-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-semibold">
             <button
               type="button"
               onClick={() => setOperatorMetric("amount")}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              className={`flex-1 sm:flex-none text-center px-2.5 sm:px-3 py-1.5 rounded-lg transition ${
                 operatorMetric === "amount"
                   ? "bg-emerald-500 text-black font-bold shadow"
                   : "text-zinc-400 hover:text-white"
@@ -641,7 +641,7 @@ export default function AnalyticsDashboardPage() {
             <button
               type="button"
               onClick={() => setOperatorMetric("volume")}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              className={`flex-1 sm:flex-none text-center px-2.5 sm:px-3 py-1.5 rounded-lg transition ${
                 operatorMetric === "volume"
                   ? "bg-emerald-500 text-black font-bold shadow"
                   : "text-zinc-400 hover:text-white"
@@ -772,7 +772,7 @@ export default function AnalyticsDashboardPage() {
       {/* ═══ SECTION EN 2 COLONNES : TOP SERVICES & TOP CLIENTS ═══ */}
       <section className="grid gap-6 lg:grid-cols-2">
         {/* TOP SERVICES LES PLUS RENTABLES */}
-        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-4 sm:p-6 shadow-xl flex flex-col justify-between min-w-0">
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
@@ -869,7 +869,7 @@ export default function AnalyticsDashboardPage() {
         </article>
 
         {/* TOP DES MEILLEURS CLIENTS (VIP COCKPIT) */}
-        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+        <article className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-4 sm:p-6 shadow-xl flex flex-col justify-between min-w-0">
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
