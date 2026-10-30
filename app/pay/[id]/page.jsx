@@ -494,7 +494,7 @@ export default function PublicPaymentPage() {
                   isDark ? "border-emerald-500/20 text-slate-400" : "border-emerald-500/30 text-slate-600"
                 }`}
               >
-                <span>{isRestaurant ? "Commande :" : "Prestation :"}</span>
+                <span>{isSubscription || isRestaurant ? "Abonnement :" : "Prestation :"}</span>
                 <span className="font-semibold">{payment.service_name}</span>
               </div>
 
@@ -708,17 +708,13 @@ export default function PublicPaymentPage() {
                 <div className="flex items-center gap-1.5">
                   <span
                     className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${
-                      isSubscription
+                      isSubscription || isRestaurant
                         ? "bg-purple-500/10 text-purple-400 border-purple-500/25"
-                        : isRestaurant
-                        ? "bg-amber-500/10 text-amber-500 border-amber-500/25"
                         : "bg-emerald-500/10 text-emerald-500 border-emerald-500/25"
                     }`}
                   >
-                    {isSubscription
-                      ? "🔄 Abonnement Restaurant B2B"
-                      : isRestaurant
-                      ? "🍽️ Restaurant"
+                    {isSubscription || isRestaurant
+                      ? "🍽️ Abonnement Restaurant B2B"
                       : "💼 Freelance"}
                   </span>
                   <span
@@ -726,7 +722,7 @@ export default function PublicPaymentPage() {
                       isDark ? "text-slate-400" : "text-slate-600"
                     }`}
                   >
-                    Facture émise pour{" "}
+                    {isSubscription || isRestaurant ? "Abonnement émis pour " : "Facture émise pour "}
                     <strong
                       className={`font-bold ${
                         isDark ? "text-white" : "text-slate-900"
@@ -776,7 +772,7 @@ export default function PublicPaymentPage() {
                   >
                     <Receipt className="w-3.5 h-3.5 text-emerald-500" />
                     <span>
-                      {isRestaurant ? "Désignation plat / commande" : "Prestation demandée"}
+                      {isSubscription || isRestaurant ? "Abonnement Restaurant souscrit" : "Prestation demandée"}
                     </span>
                   </span>
                   <span className="font-bold">{payment.service_name}</span>
@@ -789,8 +785,8 @@ export default function PublicPaymentPage() {
                   }`}
                 >
                   <span>
-                    {isRestaurant
-                      ? "Montant net du plat / menu"
+                    {isSubscription || isRestaurant
+                      ? "Montant net de l'abonnement mensuel"
                       : "Montant net de la prestation"}
                   </span>
                   <span className="font-semibold font-mono">
@@ -1023,7 +1019,7 @@ export default function PublicPaymentPage() {
                           isDark ? "text-slate-400" : "text-slate-600"
                         }`}
                       >
-                        Si vous avez déjà envoyé les fonds au prestataire via Wave ou Mobile Money, saisissez ici l'ID ou la référence reçue par SMS pour valider instantanément votre commande.
+                        Si vous avez déjà envoyé les fonds au prestataire via Wave ou Mobile Money, saisissez ici l'ID ou la référence reçue par SMS pour valider instantanément votre abonnement ou facture.
                       </p>
                     </div>
 

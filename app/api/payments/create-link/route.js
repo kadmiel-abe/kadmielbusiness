@@ -70,7 +70,7 @@ export async function POST(request) {
 
     if (!service_name || typeof service_name !== 'string' || !service_name.trim()) {
       return NextResponse.json(
-        { error: 'Le libellé de la prestation ou du plat est obligatoire.' },
+        { error: 'Le libellé de la prestation ou de l\'abonnement est obligatoire.' },
         { status: 400 }
       );
     }

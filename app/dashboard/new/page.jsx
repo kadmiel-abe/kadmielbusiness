@@ -564,39 +564,42 @@ export default function NewPaymentLinkPage() {
                 </div>
               )}
 
-              {/* ═══ 1. CHOIX DU TYPE D'ACTIVITÉ (FREELANCE / RESTAURANT) ═══ */}
+              {/* ═══ 1. CHOIX DU TYPE D'ACTIVITÉ (FREELANCE / ABONNEMENT RESTAURANT) ═══ */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-zinc-200 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Type d'activité & modèle</span>
+                    <span>Activité concernée</span>
                   </span>
                   <span className="text-[10px] text-zinc-400 font-mono">
-                    {businessType === "abonnement_resto"
-                      ? "Abonnement Mensuel B2B"
-                      : businessType === "restaurant"
-                      ? "Mode Restauration"
-                      : "Mode Prestations"}
+                    {businessType === "abonnement_resto" || businessType === "restaurant"
+                      ? "Abonnement Restaurant B2B"
+                      : "Prestations Freelance"}
                   </span>
                 </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  {/* Bouton Freelance */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1 : Freelance */}
                   <button
                     type="button"
-                    onClick={() => setBusinessType("freelance")}
-                    className={`p-3 sm:p-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                    onClick={() => {
+                      setBusinessType("freelance");
+                      if (formData.service_name === "Abonnement Mensuel Solution Restaurant") {
+                        setFormData((prev) => ({ ...prev, service_name: "" }));
+                      }
+                    }}
+                    className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
                       businessType === "freelance"
                         ? "bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30"
                         : "bg-zinc-950 border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">💼</span>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">💼</span>
                         <div>
                           <p className="text-xs font-bold text-white">Freelance</p>
-                          <p className="text-[10px] text-zinc-400">Services & missions</p>
+                          <p className="text-[10px] text-zinc-400">Services, projets & missions</p>
                         </div>
                       </div>
                       <span
@@ -613,39 +616,7 @@ export default function NewPaymentLinkPage() {
                     </div>
                   </button>
 
-                  {/* Bouton Restaurant Commande */}
-                  <button
-                    type="button"
-                    onClick={() => setBusinessType("restaurant")}
-                    className={`p-3 sm:p-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
-                      businessType === "restaurant"
-                        ? "bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
-                        : "bg-zinc-950 border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🍽️</span>
-                        <div>
-                          <p className="text-xs font-bold text-white">Restaurant</p>
-                          <p className="text-[10px] text-zinc-400">Plats & commandes</p>
-                        </div>
-                      </div>
-                      <span
-                        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
-                          businessType === "restaurant"
-                            ? "border-amber-400 bg-amber-400"
-                            : "border-zinc-700"
-                        }`}
-                      >
-                        {businessType === "restaurant" && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-black" />
-                        )}
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Bouton Abonnement Restaurant B2B */}
+                  {/* Option 2 : Abonnement Restaurant */}
                   <button
                     type="button"
                     onClick={() => {
@@ -653,32 +624,32 @@ export default function NewPaymentLinkPage() {
                       if (!formData.service_name) {
                         setFormData((prev) => ({
                           ...prev,
-                          service_name: "Abonnement Mensuel Business Pay - Restaurant",
+                          service_name: "Abonnement Mensuel Solution Restaurant",
                         }));
                       }
                     }}
-                    className={`p-3 sm:p-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
-                      businessType === "abonnement_resto"
+                    className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                      businessType === "abonnement_resto" || businessType === "restaurant"
                         ? "bg-purple-500/15 border-purple-500 text-white shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/30"
                         : "bg-zinc-950 border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🔄</span>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">🍽️</span>
                         <div>
-                          <p className="text-xs font-bold text-white">Abo Resto</p>
-                          <p className="text-[10px] text-purple-300">Mensuel récurrent</p>
+                          <p className="text-xs font-bold text-white">Abonnement Restaurant</p>
+                          <p className="text-[10px] text-purple-300">Souscription mensuelle B2B récurrente</p>
                         </div>
                       </div>
                       <span
                         className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
-                          businessType === "abonnement_resto"
+                          businessType === "abonnement_resto" || businessType === "restaurant"
                             ? "border-purple-400 bg-purple-400"
                             : "border-zinc-700"
                         }`}
                       >
-                        {businessType === "abonnement_resto" && (
+                        {(businessType === "abonnement_resto" || businessType === "restaurant") && (
                           <span className="h-1.5 w-1.5 rounded-full bg-black" />
                         )}
                       </span>
@@ -799,32 +770,34 @@ export default function NewPaymentLinkPage() {
                 )}
               </div>
 
-              {/* ═══ 3. NOM DU SERVICE OU DU PLAT ═══ */}
+              {/* ═══ 3. NOM DE LA PRESTATION OU DE L'ABONNEMENT ═══ */}
               <div className="space-y-1.5 pt-2 border-t border-white/5">
                 <label className="text-xs font-bold text-zinc-200 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    {businessType === "restaurant" ? (
+                    {businessType === "abonnement_resto" || businessType === "restaurant" ? (
                       <span className="text-sm">🍽️</span>
                     ) : (
                       <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
                     )}
                     <span>
-                      {businessType === "restaurant"
-                        ? "Nom du plat ou de la commande"
-                        : "Nom de la prestation"}
+                      {businessType === "abonnement_resto" || businessType === "restaurant"
+                        ? "Libellé de l'abonnement mensuel restaurant"
+                        : "Nom de la prestation freelance"}
                     </span>
                     <span className="text-rose-400">*</span>
                   </span>
                   <span className="text-[10px] text-zinc-400">
-                    {businessType === "restaurant" ? "Addition / Menu" : "Facturation"}
+                    {businessType === "abonnement_resto" || businessType === "restaurant"
+                      ? "Abonnement Restaurant B2B"
+                      : "Facturation Freelance"}
                   </span>
                 </label>
                 <input
                   type="text"
                   required
                   placeholder={
-                    businessType === "restaurant"
-                      ? "Ex : Garba Thon Braisé, Menu Dégustation, Commande Table 4..."
+                    businessType === "abonnement_resto" || businessType === "restaurant"
+                      ? "Ex : Abonnement Mensuel Solution Restaurant, Formule Business Pay..."
                       : "Ex : Développement Site Web, Audit, Community Management..."
                   }
                   value={formData.service_name}

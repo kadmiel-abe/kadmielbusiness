@@ -602,8 +602,8 @@ export default function ClientsDirectoryPage() {
                                 {isVip && <Crown className="h-3.5 w-3.5 text-amber-400" />}
                                 {client.client_type === "entreprise_abo" && (
                                   <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded-md">
-                                    <span>🔄</span>
-                                    <span>Entreprise Abo</span>
+                                    <span>🍽️</span>
+                                    <span>Restaurant Abonné</span>
                                   </span>
                                 )}
                               </p>
@@ -761,8 +761,8 @@ export default function ClientsDirectoryPage() {
                             {isVip && <Crown className="h-3.5 w-3.5 text-amber-400" />}
                             {client.client_type === "entreprise_abo" && (
                               <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded-md">
-                                <span>🔄</span>
-                                <span>Entreprise Abo</span>
+                                <span>🍽️</span>
+                                <span>Restaurant Abonné</span>
                               </span>
                             )}
                           </p>
