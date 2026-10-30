@@ -24,7 +24,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     if (!id) {
       return NextResponse.json({ error: 'Identifiant client requis.' }, { status: 400 });
     }
@@ -160,7 +161,8 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     if (!id) {
       return NextResponse.json({ error: 'Identifiant client requis.' }, { status: 400 });
     }
@@ -258,7 +260,8 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     if (!id) {
       return NextResponse.json({ error: 'Identifiant client requis.' }, { status: 400 });
     }

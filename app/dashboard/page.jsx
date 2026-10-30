@@ -382,45 +382,112 @@ export default function DashboardPage() {
     }));
   }, [periodTransactions]);
 
-  // Délai moyen de règlement (en jours ou en heures)
+  // Délai moyen de règlement (calcul précis et comparaison par rapport au mois précédent)
   const paymentDelay = useMemo(() => {
-    const paidTxs = periodTransactions.filter(txIsPaid);
+    const paidTxs = activityTransactions.filter(txIsPaid);
     if (!paidTxs.length) {
-      return { formatted: "0 jour", rawDays: 0, rawHours: 0, count: 0 };
+      return {
+        formatted: "0h",
+        rawDays: 0,
+        rawHours: 0,
+        count: 0,
+        comparisonText: "Aucune transaction réglée sur la période",
+        comparisonBadge: "Vélocité",
+        isFaster: true,
+        diffPct: 0,
+      };
     }
-    let totalMs = 0;
-    let validCount = 0;
-    paidTxs.forEach((tx) => {
-      const created = dateOf(tx);
-      const paid = tx.paid_at
-        ? new Date(tx.paid_at)
-        : tx.updated_at
-        ? new Date(tx.updated_at)
-        : created;
-      if (created && paid && !isNaN(created.getTime()) && !isNaN(paid.getTime())) {
-        const diff = Math.max(0, paid.getTime() - created.getTime());
-        totalMs += diff;
-        validCount += 1;
-      }
-    });
-    if (!validCount) return { formatted: "0 jour", rawDays: 0, rawHours: 0, count: 0 };
-    const avgHours = totalMs / (validCount * 1000 * 60 * 60);
-    const avgDays = avgHours / 24;
+
+    const calcAverageHours = (list) => {
+      let totalMs = 0;
+      let valid = 0;
+      list.forEach((tx) => {
+        const created = dateOf(tx);
+        const paid = tx.paid_at
+          ? new Date(tx.paid_at)
+          : tx.updated_at
+          ? new Date(tx.updated_at)
+          : created;
+        if (created && paid && !isNaN(created.getTime()) && !isNaN(paid.getTime())) {
+          const diff = Math.max(0, paid.getTime() - created.getTime());
+          totalMs += diff;
+          valid += 1;
+        }
+      });
+      return valid ? totalMs / (valid * 1000 * 60 * 60) : 0;
+    };
+
+    const overallAvgHours = calcAverageHours(paidTxs);
+    const avgDays = overallAvgHours / 24;
+
     let formatted = "";
     if (avgDays >= 1) {
-      formatted = `${avgDays.toFixed(1)} jour${avgDays >= 2 ? "s" : ""} en moyenne`;
-    } else if (avgHours >= 1) {
-      formatted = `${avgHours.toFixed(1)} heure${avgHours >= 2 ? "s" : ""} en moyenne`;
+      formatted = `${avgDays.toFixed(1)} jour${avgDays >= 2 ? "s" : ""}`;
+    } else if (overallAvgHours >= 1) {
+      formatted = `${overallAvgHours.toFixed(1)} heure${overallAvgHours >= 2 ? "s" : ""}`;
     } else {
-      formatted = "< 1h en moyenne";
+      formatted = "< 1h";
     }
+
+    // Calcul de la comparaison par rapport au mois précédent (MoM)
+    const now = new Date();
+    const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    const curMonthPaid = transactions.filter((tx) => {
+      if (!txIsPaid(tx)) return false;
+      if (activityFilter !== "all" && (tx.business_type || "freelance") !== activityFilter) return false;
+      const d = dateOf(tx);
+      return d && d >= curMonthStart;
+    });
+
+    const prevMonthPaid = transactions.filter((tx) => {
+      if (!txIsPaid(tx)) return false;
+      if (activityFilter !== "all" && (tx.business_type || "freelance") !== activityFilter) return false;
+      const d = dateOf(tx);
+      return d && d >= prevMonthStart && d <= prevMonthEnd;
+    });
+
+    const curMonthAvg = calcAverageHours(curMonthPaid);
+    const prevMonthAvg = calcAverageHours(prevMonthPaid);
+
+    let comparisonText = `${paidTxs.length} facture${paidTxs.length > 1 ? "s" : ""} honorée${paidTxs.length > 1 ? "s" : ""}`;
+    let comparisonBadge = "Vélocité";
+    let isFaster = true;
+    let diffPct = 0;
+
+    if (prevMonthAvg > 0 && curMonthAvg > 0) {
+      if (curMonthAvg < prevMonthAvg) {
+        diffPct = Math.round(((prevMonthAvg - curMonthAvg) / prevMonthAvg) * 100);
+        isFaster = true;
+        comparisonBadge = `-${diffPct}% vs M-1`;
+        comparisonText = `Règlement ${diffPct}% plus rapide que le mois précédent (${curMonthAvg.toFixed(1)}h vs ${prevMonthAvg.toFixed(1)}h)`;
+      } else if (curMonthAvg > prevMonthAvg) {
+        diffPct = Math.round(((curMonthAvg - prevMonthAvg) / prevMonthAvg) * 100);
+        isFaster = false;
+        comparisonBadge = `+${diffPct}% vs M-1`;
+        comparisonText = `Délai plus long de ${diffPct}% par rapport au mois précédent (${curMonthAvg.toFixed(1)}h vs ${prevMonthAvg.toFixed(1)}h)`;
+      } else {
+        comparisonBadge = "Stable";
+        comparisonText = "Délai moyen identique au mois précédent";
+      }
+    } else if (curMonthAvg > 0 && prevMonthAvg === 0) {
+      comparisonBadge = `${curMonthAvg.toFixed(1)}h ce mois`;
+      comparisonText = "Premiers règlements enregistrés ce mois";
+    }
+
     return {
       formatted,
       rawDays: Number(avgDays.toFixed(1)),
-      rawHours: Number(avgHours.toFixed(1)),
-      count: validCount,
+      rawHours: Number(overallAvgHours.toFixed(1)),
+      count: paidTxs.length,
+      comparisonText,
+      comparisonBadge,
+      isFaster,
+      diffPct,
     };
-  }, [periodTransactions]);
+  }, [activityTransactions, transactions, activityFilter]);
 
   // Tendance CA vs Mois Dernier (MoM)
   const momGrowth = useMemo(() => {
@@ -439,6 +506,7 @@ export default function DashboardPage() {
 
     transactions.forEach((tx) => {
       if (!txIsPaid(tx)) return;
+      if (activityFilter !== "all" && (tx.business_type || "freelance") !== activityFilter) return false;
       const date = dateOf(tx);
       if (!date) return;
       const amount = txAmountNet(tx);
@@ -467,16 +535,16 @@ export default function DashboardPage() {
       prevRevenue,
       diff: curRevenue - prevRevenue,
     };
-  }, [transactions]);
+  }, [transactions, activityFilter]);
 
   // Répartition par opérateur Mobile Money (Wave, Orange, MTN, Moov)
   const operatorBreakdown = useMemo(() => {
-    const paidTxs = periodTransactions.filter(txIsPaid);
+    const paidTxs = activityTransactions.filter(txIsPaid);
     const ops = {
-      wave: { code: "wave", label: "Wave", amount: 0, count: 0, color: "#00A3FF" },
-      orange: { code: "orange", label: "Orange Money", amount: 0, count: 0, color: "#FF7900" },
-      mtn: { code: "mtn", label: "MTN MoMo", amount: 0, count: 0, color: "#FFCC00" },
-      moov: { code: "moov", label: "Moov Money", amount: 0, count: 0, color: "#0055A5" },
+      wave: { code: "wave", label: "Wave", icon: "🌊", amount: 0, count: 0, color: "#00A3FF" },
+      orange: { code: "orange", label: "Orange Money", icon: "🍊", amount: 0, count: 0, color: "#FF7900" },
+      mtn: { code: "mtn", label: "MTN MoMo", icon: "🟡", amount: 0, count: 0, color: "#FFCC00" },
+      moov: { code: "moov", label: "Moov Money", icon: "🟣", amount: 0, count: 0, color: "#0089cf" },
     };
 
     let totalAmt = 0;
@@ -502,7 +570,7 @@ export default function DashboardPage() {
       percentage: totalAmt > 0 ? Math.round((op.amount / totalAmt) * 100) : 0,
       volumePct: paidTxs.length > 0 ? Math.round((op.count / paidTxs.length) * 100) : 0,
     })).sort((a, b) => b.amount - a.amount);
-  }, [periodTransactions]);
+  }, [activityTransactions]);
 
   // Filtrage combiné : Période + Activité + Recherche textuelle + Filtre par statut
   const filteredTransactions = useMemo(() => {
@@ -749,11 +817,16 @@ export default function DashboardPage() {
     {
       label: "Délai moyen de règlement",
       value: paymentDelay.formatted,
-      note: `${paymentDelay.count} facture${paymentDelay.count > 1 ? "s" : ""} honorée${paymentDelay.count > 1 ? "s" : ""}`,
+      note: paymentDelay.comparisonText,
       icon: Clock,
       color: "text-emerald-400",
       bg: "bg-emerald-500/15 border border-emerald-500/30",
-      badge: "Vélocité",
+      badge: paymentDelay.comparisonBadge,
+      badgeCustomClass: paymentDelay.isFaster
+        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+        : paymentDelay.diffPct > 0
+        ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+        : "bg-zinc-800 text-zinc-400 border-zinc-700",
     },
     {
       label: "Tendance vs mois dernier",
@@ -1087,10 +1160,7 @@ export default function DashboardPage() {
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm"
-                    style={{ backgroundColor: op.color }}
-                  />
+                  <span className="text-base shrink-0">{op.icon}</span>
                   <span className="text-xs font-bold text-white truncate">
                     {op.label}
                   </span>
