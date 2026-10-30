@@ -25,7 +25,11 @@ export async function GET() {
       );
     }
 
-    const user = session.user;
+    // Récupérer l'utilisateur avec ses métadonnées fraîches directement depuis la base Supabase
+    const { data: dbUserData, error: dbUserError } =
+      await supabaseAdmin.auth.admin.getUserById(session.user.id);
+
+    const user = dbUserData?.user || session.user;
     const metadata = user.user_metadata || {};
 
     const profile = {
@@ -81,8 +85,10 @@ export async function POST(request) {
       default_fee_bearer,
     } = body || {};
 
-    const user = session.user;
-    const currentMetadata = user.user_metadata || {};
+    // Récupérer les métadonnées actuelles fraîches depuis la base Supabase
+    const { data: dbUserData } = await supabaseAdmin.auth.admin.getUserById(session.user.id);
+    const freshUser = dbUserData?.user || session.user;
+    const currentMetadata = freshUser.user_metadata || {};
 
     const updatedMetadata = {
       ...currentMetadata,
@@ -100,7 +106,7 @@ export async function POST(request) {
 
     // Mise à jour sécurisée via Supabase Admin (Service Role)
     const { data: updatedUserData, error: updateError } =
-      await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      await supabaseAdmin.auth.admin.updateUserById(session.user.id, {
         user_metadata: updatedMetadata,
       });
 

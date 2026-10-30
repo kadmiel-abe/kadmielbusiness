@@ -121,8 +121,10 @@ export async function POST(request) {
       );
     }
 
-    // Mise à jour immédiate des métadonnées utilisateur
-    const currentMeta = user.user_metadata || {};
+    // Mise à jour immédiate des métadonnées utilisateur avec les données fraîches de la DB
+    const { data: dbUserData } = await supabaseAdmin.auth.admin.getUserById(user.id);
+    const currentMeta = dbUserData?.user?.user_metadata || user.user_metadata || {};
+
     const { error: metaError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
       {
@@ -176,7 +178,8 @@ export async function DELETE() {
     }
 
     const user = session.user;
-    const currentMeta = user.user_metadata || {};
+    const { data: dbUserData } = await supabaseAdmin.auth.admin.getUserById(user.id);
+    const currentMeta = dbUserData?.user?.user_metadata || user.user_metadata || {};
 
     const { error: metaError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
