@@ -399,69 +399,75 @@ export default function ClientsDirectoryPage() {
             )}
           </div>
 
-          {/* Filtre de Période Avancé */}
-          <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black border border-emerald-500/30 overflow-x-auto no-scrollbar shadow-sm">
-            {[
-              { id: "all", label: "Tous" },
-              { id: "month", label: "Ce mois" },
-              { id: "quarter", label: "Ce trimestre" },
-              { id: "year", label: "Cette année" },
-              { id: "custom", label: "Dates..." },
-            ].map(({ id, label }) => {
-              const active = periodPreset === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setPeriodPreset(id)}
-                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
-                    active
-                      ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          {/* Filtre de Période Avancé - Élargi & Aéré */}
+          <div className="flex flex-col gap-2 w-full lg:w-auto">
+            <div className="inline-flex items-center gap-2.5 px-6 py-2.5 rounded-2xl bg-black border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-fit max-w-full shrink-0">
+              <span className="text-emerald-400 shrink-0 mr-1.5 flex items-center">
+                <Calendar className="h-4 w-4" />
+              </span>
 
-        {/* Champs Date Personnalisée */}
-        {periodPreset === "custom" && (
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black border border-emerald-500/30 animate-slide-up text-xs flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-zinc-400">Du</span>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
-              />
+              {[
+                { id: "all", label: "Tous" },
+                { id: "month", label: "Ce mois" },
+                { id: "quarter", label: "Ce trimestre" },
+                { id: "year", label: "Cette année" },
+                { id: "custom", label: "Dates..." },
+              ].map(({ id, label }) => {
+                const active = periodPreset === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPeriodPreset(id)}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
+                      active
+                        ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-zinc-400">Au</span>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
-              />
-            </div>
-            {(customStartDate || customEndDate) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomStartDate("");
-                  setCustomEndDate("");
-                }}
-                className="p-1 text-zinc-400 hover:text-white"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+
+            {/* Champs Date Personnalisée */}
+            {periodPreset === "custom" && (
+              <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-black border border-emerald-500/30 animate-slide-up text-xs flex-wrap shadow-lg w-fit">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-zinc-400">Du</span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-zinc-400">Au</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="h-8 px-2.5 rounded-lg bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 [color-scheme:dark]"
+                  />
+                </div>
+                {(customStartDate || customEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomStartDate("");
+                      setCustomEndDate("");
+                    }}
+                    className="p-1 text-zinc-400 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* Filtres par Statut CRM */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs pt-1 border-t border-white/5">
