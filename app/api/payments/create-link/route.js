@@ -61,30 +61,52 @@ export async function POST(request) {
     const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
     const computedFeeBearer = fee_bearer === 'freelance' ? 'freelance' : 'client';
 
-    // 3. Insertion du paiement dans la table `payments`
+    // 3. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
     const paymentId = id || crypto.randomUUID();
-    const { data: payment, error: payErr } = await supabaseAdmin
+    const fullPayload = {
+      id: paymentId,
+      client_id: clientId,
+      service_name: service_name.trim(),
+      amount_net: Number(amount_net),
+      amount_total: Number(amount_total),
+      status: 'en_attente',
+      expires_at: computedExpiresAt,
+      is_single_use: isSingleUse,
+      max_uses: computedMaxUses,
+      times_used: 0,
+      fee_bearer: computedFeeBearer,
+    };
+
+    let { data: payment, error: payErr } = await supabaseAdmin
       .from('payments')
-      .insert({
+      .insert(fullPayload)
+      .select('*, client:clients(*)')
+      .single();
+
+    // Si les colonnes étendues n'ont pas encore été créées dans Supabase, repli gracieux
+    if (payErr && payErr.message && (payErr.message.includes('column') || payErr.message.includes('schema cache'))) {
+      console.warn('[CreateLink API] Repli résilient sur les colonnes de base :', payErr.message);
+      const basePayload = {
         id: paymentId,
         client_id: clientId,
         service_name: service_name.trim(),
         amount_net: Number(amount_net),
         amount_total: Number(amount_total),
         status: 'en_attente',
-        expires_at: computedExpiresAt,
-        is_single_use: isSingleUse,
-        max_uses: computedMaxUses,
-        times_used: 0,
-        fee_bearer: computedFeeBearer,
-      })
-      .select('*, client:clients(*)')
-      .single();
+      };
+      const retry = await supabaseAdmin
+        .from('payments')
+        .insert(basePayload)
+        .select('*, client:clients(*)')
+        .single();
+      payment = retry.data;
+      payErr = retry.error;
+    }
 
-    if (payErr) {
+    if (payErr || !payment) {
       console.error('[CreateLink API] Erreur insertion paiement :', payErr);
       return NextResponse.json(
-        { error: 'Erreur lors de la création du paiement en base de données.', details: payErr.message },
+        { error: 'Erreur lors de la création du paiement en base de données.', details: payErr?.message },
         { status: 500 }
       );
     }
