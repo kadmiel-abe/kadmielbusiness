@@ -563,29 +563,45 @@ export default function DashboardPage() {
       )}
 
       {/* En-tête */}
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="mb-1 text-sm capitalize text-zinc-500">
-            {new Intl.DateTimeFormat("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }).format(new Date())}
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Kadmiel Business Pay
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Centre de gestion de vos paiements mobiles Wave, Orange, MTN et Moov.
-          </p>
+      <header className="space-y-5">
+        {/* Ligne 1 : Titre de l'application et Actions d'en-tête (Cloche + Nouveau lien) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="mb-1 text-xs capitalize text-zinc-500 font-medium">
+              {new Intl.DateTimeFormat("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }).format(new Date())}
+            </p>
+            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+              Kadmiel Business Pay
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm text-zinc-400">
+              Centre de gestion de vos paiements mobiles Wave, Orange, MTN et Moov.
+            </p>
+          </div>
+
+          {/* Actions rapides : Cloche de Notifications In-App + Bouton Nouveau Lien */}
+          <div className="flex items-center gap-3 shrink-0">
+            <NotificationBell />
+
+            <Link
+              href="/dashboard/new"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400 shrink-0 active:scale-95"
+            >
+              <Plus className="h-4 w-4 stroke-[3]" />
+              <span>Nouveau lien</span>
+            </Link>
+          </div>
         </div>
 
-        {/* Contrôles du Header : Sélecteur de Période Avancé + Bouton Nouveau Lien */}
-        <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-3">
-          {/* Composant de Sélection de Période Avancé avec Raccourcis et Calendrier */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar">
+        {/* Ligne 2 : Sélecteur de Période Élargi & Déroulé (Tous les 5 boutons 100% visibles sans aucune coupure) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+          <div className="flex flex-col gap-2.5 w-full sm:w-auto">
+            {/* Conteneur élargi des filtres temporels */}
+            <div className="inline-flex items-center gap-2.5 px-6 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar w-fit max-w-full">
               <span className="text-emerald-400 shrink-0 mr-1.5 flex items-center">
                 <CalendarDays className="h-4 w-4" />
               </span>
@@ -603,7 +619,7 @@ export default function DashboardPage() {
                     key={id}
                     type="button"
                     onClick={() => setPeriodPreset(id)}
-                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 ${
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 whitespace-nowrap ${
                       active
                         ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
                         : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
@@ -617,7 +633,7 @@ export default function DashboardPage() {
 
             {/* Champs Date début & Date fin affichés quand "Personnalisé" est sélectionné */}
             {periodPreset === "custom" && (
-              <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 animate-slide-up text-xs flex-wrap shadow-lg">
+              <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 animate-slide-up text-xs flex-wrap shadow-lg w-fit">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-zinc-400">Du</span>
                   <input
@@ -651,19 +667,6 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
-          </div>
-
-          {/* Actions rapides : Cloche de Notifications In-App + Bouton Nouveau Lien */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <NotificationBell />
-
-            <Link
-              href="/dashboard/new"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400 shrink-0 active:scale-95"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Nouveau lien</span>
-            </Link>
           </div>
         </div>
       </header>
