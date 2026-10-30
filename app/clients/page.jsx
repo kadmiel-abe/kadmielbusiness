@@ -411,7 +411,7 @@ export default function ClientsDirectoryPage() {
                 { id: "month", label: "Ce mois" },
                 { id: "quarter", label: "Ce trimestre" },
                 { id: "year", label: "Cette année" },
-                { id: "custom", label: "Dates..." },
+                { id: "custom", label: "Personnalisé" },
               ].map(({ id, label }) => {
                 const active = periodPreset === id;
                 return (
