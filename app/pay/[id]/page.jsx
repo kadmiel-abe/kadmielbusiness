@@ -18,6 +18,11 @@ import {
   Ban,
   Repeat,
   CalendarClock,
+  Check,
+  Mail,
+  MessageCircle,
+  Send,
+  LoaderCircle,
 } from "lucide-react";
 import { generateReceiptPDF } from "@/lib/exportUtils";
 
@@ -70,6 +75,61 @@ export default function PublicPaymentPage() {
   // État du bouton de paiement GeniusPay
   const [payingGenius, setPayingGenius] = useState(false);
   const [payError, setPayError] = useState(null);
+
+  // États pour l'envoi automatique du reçu
+  const [receiptEmail, setReceiptEmail] = useState("");
+  const [sendingReceiptEmail, setSendingReceiptEmail] = useState(false);
+  const [receiptEmailSent, setReceiptEmailSent] = useState(false);
+  const [receiptToast, setReceiptToast] = useState("");
+
+  const handleOpenWhatsAppReceipt = () => {
+    if (!payment) return;
+    const client = payment.client || (Array.isArray(payment.clients) ? payment.clients[0] : payment.clients) || {};
+    const rawPhone = client.phone || client.telephone || payment.client_phone || "";
+    const cleanPhone = rawPhone.replace(/[^\d]/g, "");
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://kadmielbusiness.vercel.app";
+    const receiptUrl = `${baseUrl}/receipt/${payment.id}`;
+    const clientName = client.name || client.nom || payment.client_name || "Client";
+    const service = payment.service_name || payment.service || "Prestation";
+    const totalAmount = formatAmount(payment.amount_total ?? payment.montant_total ?? payment.amount_net);
+
+    const message = `*REÇU OFFICIEL DE PAIEMENT — KADMIEL BUSINESS PAY* 🧾✨\n\nBonjour *${clientName}*,\nVotre règlement a été validé et encaissé avec succès.\n\n📌 *Détails de la transaction :*\n• *Prestation :* ${service}\n• *Montant réglé :* ${totalAmount}\n• *Date & heure :* ${formatDate(payment.paid_at || payment.updated_at || payment.created_at)}\n• *Réf. transaction :* ${payment.geniuspay_ref || payment.manual_tx_id || payment.id.slice(0, 12)}\n\n🔗 *Consultez et téléchargez votre reçu officiel certifié ici :*\n👉 ${receiptUrl}\n\nMerci pour votre confiance !\n— _Kadmiel Business Pay_`;
+
+    window.open(
+      `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  const handleSendReceiptEmail = async (e) => {
+    if (e) e.preventDefault();
+    if (!receiptEmail.trim()) return;
+
+    setSendingReceiptEmail(true);
+    try {
+      const res = await fetch("/api/receipt/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: payment.id,
+          email: receiptEmail.trim(),
+          channel: "email",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Impossible d'envoyer l'email.");
+      }
+      setReceiptEmailSent(true);
+      setReceiptToast("Reçu certifié envoyé par email avec succès !");
+      setTimeout(() => setReceiptToast(""), 3500);
+    } catch (err) {
+      alert(err.message || "Erreur lors de l'envoi de l'email.");
+    } finally {
+      setSendingReceiptEmail(false);
+    }
+  };
 
   // 1. Charger les détails du paiement
   const fetchPayment = async () => {
@@ -304,15 +364,88 @@ export default function PublicPaymentPage() {
                 </span>
               </div>
 
-              {/* Bouton Téléchargement Reçu PDF officiel */}
-              <button
-                type="button"
-                onClick={() => generateReceiptPDF(payment)}
-                className="w-full mt-2 h-11 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition-all flex items-center justify-center gap-2"
-              >
-                <FileText className="w-4 h-4 text-emerald-400" />
-                <span>Télécharger mon reçu officiel (PDF)</span>
-              </button>
+              {/* Module Reçu Automatique Intégré (Partie 4 & 7) */}
+              <div className="pt-3 space-y-3 border-t border-emerald-500/20 text-left">
+                {receiptToast && (
+                  <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center animate-slide-up flex items-center justify-center gap-1.5">
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>{receiptToast}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Consulter le Reçu Officiel en Ligne */}
+                  <a
+                    href={`/receipt/${payment.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-11 px-3 rounded-xl bg-emerald-500 text-black font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-emerald-400 transition shadow-md shadow-emerald-500/20 active:scale-95 text-center"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Consulter le Reçu Officiel</span>
+                  </a>
+
+                  {/* Recevoir sur WhatsApp (1 Clic) */}
+                  <button
+                    type="button"
+                    onClick={handleOpenWhatsAppReceipt}
+                    className="h-11 px-3 rounded-xl bg-[#25D366] text-black font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-[#20ba59] transition shadow-md shadow-[#25D366]/20 active:scale-95 text-center"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-black" />
+                    <span>Recevoir sur WhatsApp</span>
+                  </button>
+                </div>
+
+                {/* Formulaire d'envoi automatique par Email */}
+                <div className="p-3.5 rounded-2xl bg-black/60 border border-white/10 space-y-2">
+                  <span className="text-[11px] font-semibold text-zinc-300 flex items-center justify-between">
+                    <span>Recevoir votre reçu certifié par Email :</span>
+                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Automatique</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Mail className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        placeholder="votre.email@exemple.com"
+                        value={receiptEmail}
+                        onChange={(e) => setReceiptEmail(e.target.value)}
+                        className="w-full h-9 pl-9 pr-2.5 rounded-xl bg-zinc-900 border border-emerald-500/30 text-white text-xs outline-none focus:border-emerald-400 placeholder:text-zinc-600"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={sendingReceiptEmail || !receiptEmail.trim()}
+                      onClick={handleSendReceiptEmail}
+                      className="h-9 px-3.5 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition shrink-0 flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+                    >
+                      {sendingReceiptEmail ? (
+                        <LoaderCircle className="w-3.5 h-3.5 animate-spin" />
+                      ) : receiptEmailSent ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Envoyé</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Envoyer</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Téléchargement PDF direct (optionnel) */}
+                <button
+                  type="button"
+                  onClick={() => generateReceiptPDF(payment)}
+                  className="w-full h-9 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 font-medium text-[11px] transition flex items-center justify-center gap-1.5 border border-white/5"
+                >
+                  <FileText className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Télécharger également une copie PDF sur cet appareil</span>
+                </button>
+              </div>
             </div>
           ) : isExpired ? (
             /* CAS 2 : LIEN EXPIRÉ */

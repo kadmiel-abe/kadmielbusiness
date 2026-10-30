@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendReceiptEmail } from '@/lib/receiptService';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -156,6 +157,23 @@ export async function PATCH(request) {
         { error: 'Impossible de mettre à jour le statut du paiement.', details: error.message },
         { status: 500 }
       );
+    }
+
+    // Envoi automatique du reçu certifié par email si le paiement vient d'être validé
+    if (newStatus === 'paye') {
+      const client = updated.client || {};
+      const clientEmail = client.email || updated.receipt_email;
+      if (clientEmail) {
+        try {
+          const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'kadmielbusiness.vercel.app';
+          const proto = request.headers.get('x-forwarded-proto') || 'https';
+          const baseUrl = `${proto}://${host}`;
+          await sendReceiptEmail({ toEmail: clientEmail, payment: updated, baseUrl });
+          console.info(`[Payments PATCH] Reçu officiel envoyé automatiquement à ${clientEmail}`);
+        } catch (emailErr) {
+          console.warn('[Payments PATCH] Envoi automatique email reçu non bloquant :', emailErr);
+        }
+      }
     }
 
     return NextResponse.json({

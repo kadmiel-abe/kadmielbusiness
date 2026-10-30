@@ -15,7 +15,7 @@ export async function GET(request, { params }) {
     // Récupération du paiement avec la relation client (clé étrangère client_id -> clients)
     const { data: payment, error } = await supabaseAdmin
       .from('payments')
-      .select('id, service_name, amount_net, amount_total, status, created_at, paid_at, geniuspay_ref, expires_at, is_single_use, max_uses, times_used, fee_bearer, client:clients(id, name, phone, email)')
+      .select('id, service_name, amount_net, amount_total, status, created_at, paid_at, geniuspay_ref, manual_tx_id, payment_method, expires_at, is_single_use, max_uses, times_used, fee_bearer, receipt_email, receipt_sent_at, client:clients(id, name, phone, email)')
       .eq('id', id)
       .maybeSingle();
 
@@ -64,6 +64,10 @@ export async function GET(request, { params }) {
           status: effectiveStatus,
           statut: effectiveStatus,
           fee_bearer: payment.fee_bearer || 'client',
+          payment_method: payment.payment_method || null,
+          manual_tx_id: payment.manual_tx_id || null,
+          receipt_email: payment.receipt_email || null,
+          receipt_sent_at: payment.receipt_sent_at || null,
           created_at: payment.created_at,
           paid_at: payment.paid_at || null,
           geniuspay_ref: payment.geniuspay_ref || null,

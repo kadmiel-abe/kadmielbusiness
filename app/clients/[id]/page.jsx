@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Phone,
   Plus,
+  ReceiptText,
   RefreshCw,
   Save,
   Search,
@@ -305,7 +306,8 @@ export default function ClientDetailPage() {
 
     let msg = "";
     if (isPaid) {
-      msg = `Bonjour ${name},\n\nVotre règlement de ${amount} pour la prestation "${service}" est bien confirmé.\nMerci pour votre confiance !`;
+      const receiptLink = `${baseUrl}/receipt/${tx.id}`;
+      msg = `*REÇU OFFICIEL DE PAIEMENT — KADMIEL BUSINESS PAY* 🧾✨\n\nBonjour ${name},\nVotre règlement de ${amount} pour la prestation "${service}" a bien été validé et encaissé.\n\n🔗 *Consultez et téléchargez votre reçu officiel certifié ici :*\n👉 ${receiptLink}\n\nMerci pour votre confiance !\n— _Kadmiel Business Pay_`;
     } else {
       const feeNote =
         tx.fee_bearer === "freelance"
@@ -319,6 +321,39 @@ export default function ClientDetailPage() {
       "_blank",
       "noopener,noreferrer"
     );
+  };
+
+  // Envoi automatique du reçu certifié par email
+  const handleSendReceiptEmail = async (e, tx) => {
+    e.stopPropagation();
+    let targetEmail = formData.email || client?.email || tx.receipt_email;
+    if (!targetEmail) {
+      targetEmail = window.prompt(
+        `Veuillez saisir l'adresse email de ${formData.name || client?.name || "ce client"} pour lui envoyer son reçu certifié :`
+      );
+    }
+    if (!targetEmail || !targetEmail.trim()) return;
+
+    try {
+      showToast("Envoi du reçu officiel en cours...");
+      const res = await fetch("/api/receipt/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: tx.id,
+          email: targetEmail.trim(),
+          channel: "email",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Impossible d'envoyer l'email.");
+      }
+      showToast(`Reçu certifié envoyé avec succès à ${targetEmail.trim()} !`);
+    } catch (err) {
+      console.error("Erreur envoi email reçu :", err);
+      showToast(err.message || "Erreur lors de l'envoi de l'email.");
+    }
   };
 
   // Copier le lien de paiement public
@@ -1136,17 +1171,41 @@ export default function ClientDetailPage() {
                             <span>WhatsApp</span>
                           </button>
 
-                          {/* Télécharger Reçu Officiel PDF si payé */}
+                          {/* Actions Reçu Automatique si payé */}
                           {isPaid && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleDownloadReceipt(e, tx)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-black transition text-[11px] font-bold"
-                              title="Télécharger le reçu officiel au format PDF"
-                            >
-                              <FileSpreadsheet className="h-3 w-3" />
-                              <span>Reçu PDF</span>
-                            </button>
+                            <>
+                              {/* Consulter le reçu certifié en ligne */}
+                              <Link
+                                href={`/receipt/${tx.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black transition text-[11px] font-bold"
+                                title="Consulter le reçu certifié dématérialisé"
+                              >
+                                <ReceiptText className="h-3 w-3" />
+                                <span>Reçu</span>
+                              </Link>
+
+                              {/* Envoyer le reçu par email */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleSendReceiptEmail(e, tx)}
+                                className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition"
+                                title="Envoyer le reçu certifié par email"
+                              >
+                                <Mail className="h-3.5 w-3.5 text-emerald-400" />
+                              </button>
+
+                              {/* Télécharger Reçu Officiel PDF si payé */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleDownloadReceipt(e, tx)}
+                                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                                title="Télécharger le reçu officiel au format PDF"
+                              >
+                                <FileSpreadsheet className="h-3.5 w-3.5" />
+                              </button>
+                            </>
                           )}
 
                           {/* Ouvrir la page de paiement public */}

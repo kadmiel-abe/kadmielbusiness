@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendReceiptEmail } from '@/lib/receiptService';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -234,12 +235,27 @@ export async function POST(request) {
         .select()
         .single();
 
-      if (updateError) {
-        console.error('[Webhook] Erreur mise à jour paiement payé :', updateError);
-        return NextResponse.json(
-          { error: 'Erreur mise à jour base de données.' },
-          { status: 500 }
-        );
+      // Envoi automatique du reçu officiel par email si une adresse est associée
+      try {
+        let clientEmail = updated.receipt_email;
+        if (!clientEmail && updated.client_id) {
+          const { data: clientObj } = await supabaseAdmin
+            .from('clients')
+            .select('email')
+            .eq('id', updated.client_id)
+            .single();
+          clientEmail = clientObj?.email;
+        }
+
+        if (clientEmail) {
+          const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'kadmielbusiness.vercel.app';
+          const proto = request.headers.get('x-forwarded-proto') || 'https';
+          const baseUrl = `${proto}://${host}`;
+          await sendReceiptEmail({ toEmail: clientEmail, payment: updated, baseUrl });
+          console.info(`[Webhook] Reçu officiel envoyé automatiquement par email à ${clientEmail}`);
+        }
+      } catch (receiptErr) {
+        console.warn('[Webhook] Notification automatique reçu email non bloquante :', receiptErr);
       }
 
       console.info(`[Webhook - Succès] Paiement ${paymentId} validé avec succès (${provider}). Utilisations: ${newTimesUsed}/${maxUses}.`);

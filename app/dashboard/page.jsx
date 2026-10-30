@@ -27,6 +27,7 @@ import {
   FileText,
   CalendarDays,
   Trash2,
+  Mail,
 } from "lucide-react";
 import {
   exportTransactionsToCSV,
@@ -409,9 +410,10 @@ export default function DashboardPage() {
 
     let message = "";
     if (isPaid) {
-      message = `Bonjour ${name},\n\nVotre règlement de ${formatAmount(
+      const receiptLink = `${baseUrl}/receipt/${tx.id}`;
+      message = `*REÇU OFFICIEL DE PAIEMENT — KADMIEL BUSINESS PAY* 🧾✨\n\nBonjour ${name},\nVotre règlement de ${formatAmount(
         txAmountTotal(tx)
-      )} pour la prestation "${service}" a bien été confirmé.\nMerci pour votre confiance !`;
+      )} pour la prestation "${service}" a bien été validé et encaissé.\n\n🔗 *Consultez et téléchargez votre reçu certifié ici :*\n👉 ${receiptLink}\n\nMerci pour votre confiance !\n— _Kadmiel Business Pay_`;
     } else {
       const feeText =
         tx.fee_bearer === "freelance"
@@ -428,6 +430,41 @@ export default function DashboardPage() {
       "_blank",
       "noopener,noreferrer"
     );
+  };
+
+  // Envoi automatique du reçu certifié par email
+  const handleSendReceiptEmail = async (tx) => {
+    setActionError("");
+    const client = clientOf(tx);
+    let targetEmail = client.email || tx.receipt_email;
+    if (!targetEmail) {
+      targetEmail = window.prompt(
+        `Veuillez saisir l'adresse email de ${clientName(tx)} pour lui envoyer son reçu certifié :`
+      );
+    }
+    if (!targetEmail || !targetEmail.trim()) return;
+
+    try {
+      setToast("Envoi du reçu officiel en cours...");
+      const res = await fetch("/api/receipt/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: tx.id,
+          email: targetEmail.trim(),
+          channel: "email",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Impossible d'envoyer l'email.");
+      }
+      setToast(`Reçu certifié envoyé avec succès à ${targetEmail.trim()} !`);
+      window.setTimeout(() => setToast(""), 3500);
+    } catch (err) {
+      console.error("Erreur envoi email reçu :", err);
+      setActionError(err.message || "Erreur lors de l'envoi de l'email.");
+    }
   };
 
   // Mettre à jour le statut (Validation manuelle ou Rejet)
@@ -1180,16 +1217,40 @@ export default function DashboardPage() {
                             <ExternalLink className="h-4 w-4" />
                           </a>
 
-                          {/* Télécharger Reçu PDF (si payé) */}
+                          {/* Actions Reçu Automatique (si payé) */}
                           {isPaid && (
-                            <button
-                              type="button"
-                              onClick={() => generateReceiptPDF(tx)}
-                              title="Télécharger le reçu officiel PDF"
-                              className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
-                            >
-                              <FileText className="h-4 w-4 text-emerald-400" />
-                            </button>
+                            <>
+                              {/* Voir le reçu officiel en ligne */}
+                              <Link
+                                href={`/receipt/${tx.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Consulter le reçu certifié dématérialisé"
+                                className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
+                              >
+                                <ReceiptText className="h-4 w-4 text-emerald-400" />
+                              </Link>
+
+                              {/* Envoyer le reçu par email en 1 clic */}
+                              <button
+                                type="button"
+                                onClick={() => handleSendReceiptEmail(tx)}
+                                title="Envoyer automatiquement le reçu par email"
+                                className="rounded-lg p-2 text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition"
+                              >
+                                <Mail className="h-4 w-4 text-emerald-400" />
+                              </button>
+
+                              {/* Télécharger Reçu PDF (optionnel) */}
+                              <button
+                                type="button"
+                                onClick={() => generateReceiptPDF(tx)}
+                                title="Télécharger le reçu officiel PDF"
+                                className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </button>
+                            </>
                           )}
 
                           {/* Validation Manuelle (si non payé) */}
