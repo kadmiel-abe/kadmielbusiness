@@ -31,10 +31,10 @@ export async function POST(request) {
       );
     }
 
-    // Vérification que le paiement existe et n'est pas déjà validé
+    // Vérification que le paiement existe et respecte les conditions de validité
     const { data: payment, error: fetchError } = await supabaseAdmin
       .from('payments')
-      .select('id, status')
+      .select('id, status, expires_at, is_single_use, max_uses, times_used')
       .eq('id', paymentId)
       .single();
 
@@ -42,6 +42,32 @@ export async function POST(request) {
       return NextResponse.json(
         { error: 'Paiement introuvable.' },
         { status: 404 }
+      );
+    }
+
+    const now = new Date();
+    if (payment.expires_at && now > new Date(payment.expires_at)) {
+      return NextResponse.json(
+        { error: 'Ce lien de paiement a expiré.' },
+        { status: 410 }
+      );
+    }
+
+    const isSingleUse = payment.is_single_use !== false;
+    const maxUses = Number(payment.max_uses) || 1;
+    const timesUsed = Number(payment.times_used) || 0;
+
+    if (isSingleUse && (payment.status === 'paye' || timesUsed >= 1)) {
+      return NextResponse.json(
+        { error: 'Ce lien a déjà été utilisé.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isSingleUse && timesUsed >= maxUses) {
+      return NextResponse.json(
+        { error: `Ce lien a déjà atteint son nombre maximal d'utilisations (${timesUsed}/${maxUses}).` },
+        { status: 400 }
       );
     }
 

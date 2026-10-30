@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { id, client_name, client_phone, service_name, amount_net, amount_total } = body || {};
+    const { id, client_name, client_phone, service_name, amount_net, amount_total, expires_at, is_single_use, max_uses, fee_bearer } = body || {};
 
     if (!client_name || !client_phone || !service_name || !amount_net || !amount_total) {
       return NextResponse.json(
@@ -55,7 +55,13 @@ export async function POST(request) {
       }
     }
 
-    // 2. Insertion du paiement dans la table `payments`
+    // 2. Traitement de la validité et de l'usage
+    const isSingleUse = is_single_use !== false;
+    const computedMaxUses = isSingleUse ? 1 : Math.max(1, parseInt(max_uses, 10) || 1);
+    const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
+    const computedFeeBearer = fee_bearer === 'freelance' ? 'freelance' : 'client';
+
+    // 3. Insertion du paiement dans la table `payments`
     const paymentId = id || crypto.randomUUID();
     const { data: payment, error: payErr } = await supabaseAdmin
       .from('payments')
@@ -66,6 +72,11 @@ export async function POST(request) {
         amount_net: Number(amount_net),
         amount_total: Number(amount_total),
         status: 'en_attente',
+        expires_at: computedExpiresAt,
+        is_single_use: isSingleUse,
+        max_uses: computedMaxUses,
+        times_used: 0,
+        fee_bearer: computedFeeBearer,
       })
       .select('*, client:clients(*)')
       .single();

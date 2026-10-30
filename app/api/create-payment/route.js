@@ -62,10 +62,31 @@ export async function POST(request) {
       );
     }
 
-    // Protection supplémentaire : si le paiement est déjà payé
-    if (payment.status === 'paye') {
+    // Vérification de la validité temporelle (expiration)
+    const now = new Date();
+    if (payment.expires_at && now > new Date(payment.expires_at)) {
+      supabaseAdmin.from('payments').update({ status: 'expire' }).eq('id', paymentId).catch(() => {});
       return NextResponse.json(
-        { error: 'Ce paiement a déjà été réglé avec succès.' },
+        { error: 'Ce lien de paiement a expiré.' },
+        { status: 410 }
+      );
+    }
+
+    // Vérification de l'usage unique ou dépassement d'utilisations autorisées
+    const isSingleUse = payment.is_single_use !== false;
+    const maxUses = Number(payment.max_uses) || 1;
+    const timesUsed = Number(payment.times_used) || 0;
+
+    if (isSingleUse && (payment.status === 'paye' || timesUsed >= 1)) {
+      return NextResponse.json(
+        { error: 'Ce lien a déjà été utilisé.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isSingleUse && timesUsed >= maxUses) {
+      return NextResponse.json(
+        { error: `Ce lien a déjà atteint son nombre maximal d'utilisations autorisées (${timesUsed}/${maxUses}).` },
         { status: 400 }
       );
     }

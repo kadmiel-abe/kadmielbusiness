@@ -14,6 +14,10 @@ import {
   Smartphone,
   Lock,
   FileText,
+  AlertTriangle,
+  Ban,
+  Repeat,
+  CalendarClock,
 } from "lucide-react";
 import { generateReceiptPDF } from "@/lib/exportUtils";
 
@@ -95,7 +99,7 @@ export default function PublicPaymentPage() {
     // Polling toutes les 5 secondes si le paiement n'est pas encore finalisé
     const interval = setInterval(async () => {
       const updated = await fetchPayment();
-      if (updated?.status === "paye") {
+      if (updated?.status === "paye" || updated?.status === "expire") {
         clearInterval(interval);
       }
     }, 5000);
@@ -196,7 +200,7 @@ export default function PublicPaymentPage() {
           </div>
           <h1 className="text-lg font-bold text-white">Facture indisponible</h1>
           <p className="text-xs text-slate-400 leading-relaxed">
-            {error || "Ce lien de paiement est invalide, a été supprimé ou a expiré."}
+            {error || "Ce lien de paiement est invalide ou a été supprimé."}
           </p>
           <div className="pt-2">
             <a
@@ -214,9 +218,25 @@ export default function PublicPaymentPage() {
     );
   }
 
+  // Calculs d'état
   const isPaid = payment.status === "paye";
   const isPendingVerification = payment.status === "a_verifier";
+  const isFeeBearerFreelance = payment.fee_bearer === "freelance";
   const feeAmount = (payment.amount_total || 0) - (payment.amount_net || 0);
+
+  const isSingleUse = payment.is_single_use !== false;
+  const timesUsed = Number(payment.times_used) || 0;
+  const maxUses = Number(payment.max_uses) || 1;
+
+  const now = new Date();
+  const isExpired =
+    Boolean(payment.is_expired) ||
+    Boolean(payment.expires_at && now > new Date(payment.expires_at)) ||
+    payment.status === "expire";
+
+  const isUsageExceeded = isSingleUse
+    ? (timesUsed >= 1 && !isPaid)
+    : (timesUsed >= maxUses && !isPaid);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-10 px-4 flex flex-col items-center justify-center selection:bg-emerald-500 selection:text-white relative">
@@ -270,6 +290,11 @@ export default function PublicPaymentPage() {
                   </span>{" "}
                   a bien été reçu.
                 </p>
+                {isSingleUse && (
+                  <span className="inline-block mt-2 text-[10px] font-semibold text-zinc-400 bg-zinc-800/80 px-2.5 py-0.5 rounded-full border border-zinc-700">
+                    Lien à usage unique · Paiement finalisé
+                  </span>
+                )}
               </div>
 
               <div className="pt-2 border-t border-emerald-500/20 text-[11px] text-slate-400 flex items-center justify-between">
@@ -289,8 +314,75 @@ export default function PublicPaymentPage() {
                 <span>Télécharger mon reçu officiel (PDF)</span>
               </button>
             </div>
+          ) : isExpired ? (
+            /* CAS 2 : LIEN EXPIRÉ */
+            <div className="rounded-2xl bg-rose-500/10 border border-rose-500/30 p-6 text-center space-y-4 animate-slide-up">
+              <div className="h-14 w-14 rounded-2xl bg-rose-500/20 text-rose-400 mx-auto flex items-center justify-center border border-rose-500/30">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="inline-block text-[10px] uppercase font-bold tracking-wider text-rose-400 bg-rose-950/80 border border-rose-800 px-2.5 py-0.5 rounded-full mb-1.5">
+                  Statut : Expiré
+                </span>
+                <h2 className="text-lg font-black text-white">
+                  Ce lien de paiement a expiré
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  La date et l'heure limites de validité fixées par le prestataire ont été dépassées. Aucun paiement ne peut plus être initié via ce lien.
+                </p>
+                {payment.expires_at && (
+                  <p className="text-[11px] font-mono text-rose-300 mt-2 bg-rose-950/40 border border-rose-900/40 py-1 px-2.5 rounded-lg inline-block">
+                    Expiré le {formatDate(payment.expires_at)}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-rose-500/20">
+                <a
+                  href="https://wa.me/2250706978570?text=Bonjour,%20mon%20lien%20de%20paiement%20a%20expiré,%20pouvez-vous%20m'en%20générer%20un%20nouveau%20?"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-slate-700"
+                >
+                  <span>Demander un nouveau lien sur WhatsApp</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                </a>
+              </div>
+            </div>
+          ) : isUsageExceeded ? (
+            /* CAS 3 : LIEN DÉJÀ UTILISÉ / QUOTA ATTEINT */
+            <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-6 text-center space-y-4 animate-slide-up">
+              <div className="h-14 w-14 rounded-2xl bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center border border-amber-500/30">
+                <Ban className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="inline-block text-[10px] uppercase font-bold tracking-wider text-amber-400 bg-amber-950/80 border border-amber-800 px-2.5 py-0.5 rounded-full mb-1.5">
+                  Lien non réutilisable
+                </span>
+                <h2 className="text-lg font-black text-white">
+                  Ce lien a déjà été utilisé
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {isSingleUse
+                    ? "Ce lien de paiement était configuré pour un usage unique et a déjà été validé."
+                    : `Ce lien de paiement a atteint son nombre maximal d'utilisations autorisées (${timesUsed}/${maxUses}).`}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-amber-500/20">
+                <a
+                  href="https://wa.me/2250706978570?text=Bonjour,%20ce%20lien%20de%20paiement%20a%20déjà%20été%20utilisé,%20merci%20de%20vérifier."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-slate-700"
+                >
+                  <span>Contacter le prestataire sur WhatsApp</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                </a>
+              </div>
+            </div>
           ) : isPendingVerification ? (
-            /* CAS 2 : PAIEMENT DE SECOURS EN VÉRIFICATION */
+            /* CAS 4 : PAIEMENT DE SECOURS EN VÉRIFICATION */
             <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5 text-center space-y-3 animate-slide-up">
               <div className="h-12 w-12 rounded-full bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
                 <Clock className="w-7 h-7 animate-pulse" />
@@ -309,8 +401,34 @@ export default function PublicPaymentPage() {
               </div>
             </div>
           ) : (
-            /* CAS 3 : FACTURE EN ATTENTE DE RÈGLEMENT */
+            /* CAS 5 : FACTURE EN ATTENTE DE RÈGLEMENT (VALIDE & ACTIVE) */
             <>
+              {/* Bannière de validité / échéance si configurée */}
+              {payment.expires_at && (
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-2.5 flex items-center justify-between text-xs text-emerald-300">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarClock className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Validité du lien :</span>
+                  </span>
+                  <span className="font-semibold text-white font-mono text-[11px]">
+                    Expire le {formatDate(payment.expires_at)}
+                  </span>
+                </div>
+              )}
+
+              {/* Information lien multi-usage */}
+              {!isSingleUse && maxUses > 1 && (
+                <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Repeat className="w-3 h-3 text-emerald-400" />
+                    <span>Lien multi-usage</span>
+                  </span>
+                  <span className="font-mono text-emerald-400 font-bold">
+                    {timesUsed} / {maxUses} paiements effectués
+                  </span>
+                </div>
+              )}
+
               {/* Message d'erreur de la passerelle le cas échéant */}
               {payError && (
                 <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-300 flex items-start gap-2">
@@ -336,19 +454,40 @@ export default function PublicPaymentPage() {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>Montant de la prestation</span>
-                  <span className="font-semibold text-slate-200">
-                    {formatAmount(payment.amount_net)}
-                  </span>
-                </div>
+                {isFeeBearerFreelance ? (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Montant de la prestation</span>
+                      <span className="font-semibold text-slate-200">
+                        {formatAmount(payment.amount_total)}
+                      </span>
+                    </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>Frais de passerelle opérateur</span>
-                  <span className="font-semibold text-amber-400">
-                    +{formatAmount(feeAmount)}
-                  </span>
-                </div>
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Frais de transaction mobile money</span>
+                      <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
+                        Offerts par le prestataire (0 FCFA)
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Montant de la prestation</span>
+                      <span className="font-semibold text-slate-200">
+                        {formatAmount(payment.amount_net)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Frais de passerelle opérateur</span>
+                      <span className="font-semibold text-amber-400">
+                        +{formatAmount(feeAmount)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Encadré Total à régler */}
@@ -358,7 +497,9 @@ export default function PublicPaymentPage() {
                     Total à régler
                   </span>
                   <p className="text-xs text-emerald-400 font-medium">
-                    Frais de passerelle inclus
+                    {isFeeBearerFreelance
+                      ? "Frais de transaction offerts"
+                      : "Frais de passerelle inclus"}
                   </p>
                 </div>
                 <span className="text-2xl font-black text-white tracking-tight">

@@ -58,6 +58,12 @@ export async function GET() {
         geniuspay_ref: p.geniuspay_ref || null,
         manual_tx_id: p.manual_tx_id || null,
         payment_method: p.payment_method || null,
+        expires_at: p.expires_at || null,
+        is_single_use: p.is_single_use !== false,
+        max_uses: Number(p.max_uses) || 1,
+        times_used: Number(p.times_used) || 0,
+        paid_at: p.paid_at || null,
+        fee_bearer: p.fee_bearer || 'client',
         created_at: p.created_at,
         updated_at: p.updated_at,
         client: {
@@ -114,12 +120,32 @@ export async function PATCH(request) {
       );
     }
 
+    // Récupération des informations de validité et d'usage actuelles
+    const { data: currentPayment } = await supabaseAdmin
+      .from('payments')
+      .select('id, status, is_single_use, max_uses, times_used')
+      .eq('id', id)
+      .single();
+
+    const isSingleUse = currentPayment?.is_single_use !== false;
+    const maxUses = Number(currentPayment?.max_uses) || 1;
+    const currentTimes = Number(currentPayment?.times_used) || 0;
+    const newTimesUsed = newStatus === 'paye' ? (currentTimes + 1) : currentTimes;
+    const shouldClose = isSingleUse || newTimesUsed >= maxUses;
+    const targetStatus = (newStatus === 'paye' && shouldClose) ? 'paye' : newStatus;
+
+    const updatePayload = {
+      status: targetStatus,
+      times_used: newTimesUsed,
+      updated_at: new Date().toISOString(),
+    };
+    if (newStatus === 'paye') {
+      updatePayload.paid_at = new Date().toISOString();
+    }
+
     const { data: updated, error } = await supabaseAdmin
       .from('payments')
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select('*, client:clients(*)')
       .single();

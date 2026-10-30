@@ -21,6 +21,11 @@ import {
   PlusCircle,
   LayoutDashboard,
   ArrowRight,
+  Clock,
+  Repeat,
+  Calendar,
+  Layers,
+  BadgePercent,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────
@@ -66,6 +71,13 @@ export default function NewPaymentLinkPage() {
     amount_net: "",
   });
 
+  // États de validité, d'usage et de répartition des frais
+  const [validityPreset, setValidityPreset] = useState("7d"); // '24h' | '48h' | '7d' | '30d' | 'custom' | 'never'
+  const [customExpiresAt, setCustomExpiresAt] = useState("");
+  const [isSingleUse, setIsSingleUse] = useState(true);
+  const [maxUses, setMaxUses] = useState("2");
+  const [feeBearer, setFeeBearer] = useState("client"); // 'client' | 'freelance'
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -73,17 +85,53 @@ export default function NewPaymentLinkPage() {
   const [createdPayment, setCreatedPayment] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  // Règle mathématique des frais (supportés par le client) :
-  // Total = Math.ceil((Net + 100) / 0.99)
-  const calculations = useMemo(() => {
-    const net = parseFloat(formData.amount_net);
-    if (!net || isNaN(net) || net <= 0) {
-      return { net: 0, fees: 0, total: 0 };
+  // Calcul dynamique de la date d'expiration
+  const calculatedExpiresAt = useMemo(() => {
+    const now = Date.now();
+    if (validityPreset === "24h") {
+      return new Date(now + 24 * 3600 * 1000);
     }
-    const total = Math.ceil((net + 100) / (1 - 0.01));
-    const fees = total - net;
-    return { net, fees, total };
-  }, [formData.amount_net]);
+    if (validityPreset === "48h") {
+      return new Date(now + 48 * 3600 * 1000);
+    }
+    if (validityPreset === "7d") {
+      return new Date(now + 7 * 24 * 3600 * 1000);
+    }
+    if (validityPreset === "30d") {
+      return new Date(now + 30 * 24 * 3600 * 1000);
+    }
+    if (validityPreset === "custom" && customExpiresAt) {
+      const d = new Date(customExpiresAt);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null; // 'never' ou personnalisé non renseigné
+  }, [validityPreset, customExpiresAt]);
+
+  // Règle mathématique des frais selon le choix du porteur (Client ou Freelance) :
+  // fee_rate = 0.01 (1%), fee_fixed = 100 FCFA
+  const calculations = useMemo(() => {
+    const rawVal = parseFloat(formData.amount_net);
+    if (!rawVal || isNaN(rawVal) || rawVal <= 0) {
+      return { net: 0, fees: 0, total: 0, requested: 0 };
+    }
+
+    if (feeBearer === "client") {
+      // 1. Frais à la charge du client :
+      // Le freelance reçoit exactement le montant net saisi (ex: 50 000 FCFA).
+      // Total payé par le client = ceil((net + 100) / 0.99)
+      const total = Math.ceil((rawVal + 100) / (1 - 0.01));
+      const fees = total - rawVal;
+      return { net: rawVal, fees, total, requested: rawVal };
+    } else {
+      // 2. Frais à la charge du freelance :
+      // Le client ne paie que le prix net affiché de la prestation (ex: 50 000 FCFA).
+      // Les frais de transaction sont prélevés sur la part du freelance.
+      const total = rawVal;
+      const fees = Math.ceil(total * 0.01 + 100);
+      const net = Math.max(0, total - fees);
+      return { net, fees, total, requested: rawVal };
+    }
+  }, [formData.amount_net, feeBearer]);
 
   // Raccourcis montants fréquents
   const setQuickAmount = (val) => {
@@ -98,6 +146,11 @@ export default function NewPaymentLinkPage() {
       service_name: "",
       amount_net: "",
     });
+    setValidityPreset("7d");
+    setCustomExpiresAt("");
+    setIsSingleUse(true);
+    setMaxUses("2");
+    setFeeBearer("client");
     setCreatedPayment(null);
     setError(null);
     setCopied(false);
@@ -126,12 +179,14 @@ export default function NewPaymentLinkPage() {
       return;
     }
     if (calculations.net <= 0) {
-      setError("Le montant net souhaité doit être supérieur à 0 FCFA.");
+      setError("Le montant doit être supérieur à 0 FCFA.");
       return;
     }
 
     setLoading(true);
     const paymentId = crypto.randomUUID();
+    const computedExpiresAt = calculatedExpiresAt ? calculatedExpiresAt.toISOString() : null;
+    const computedMaxUses = isSingleUse ? 1 : Math.max(1, parseInt(maxUses, 10) || 1);
 
     try {
       const response = await fetch("/api/payments/create-link", {
@@ -144,6 +199,10 @@ export default function NewPaymentLinkPage() {
           service_name: serviceName,
           amount_net: calculations.net,
           amount_total: calculations.total,
+          fee_bearer: feeBearer,
+          expires_at: computedExpiresAt,
+          is_single_use: isSingleUse,
+          max_uses: computedMaxUses,
           status: "en_attente",
         }),
       });
@@ -169,6 +228,11 @@ export default function NewPaymentLinkPage() {
         service_name: serviceName,
         amount_net: calculations.net,
         amount_total: calculations.total,
+        fee_bearer: feeBearer,
+        fees: calculations.fees,
+        expires_at: computedExpiresAt,
+        is_single_use: isSingleUse,
+        max_uses: computedMaxUses,
       });
     } catch (err) {
       console.error("Erreur lors de la création :", err);
@@ -194,7 +258,25 @@ export default function NewPaymentLinkPage() {
   const handleShareWhatsApp = () => {
     if (!createdPayment) return;
     const cleanPhone = createdPayment.client_phone.replace(/[^\d]/g, "");
-    const message = `Bonjour ${createdPayment.client_name},\n\nVoici votre lien de paiement sécurisé pour la prestation "${createdPayment.service_name}" :\n👉 ${createdPayment.url}\n\nMontant total : ${formatAmount(createdPayment.amount_total)}\nRèglement possible par Wave, Orange Money, MTN MoMo ou Moov Money.\n\nMerci pour votre confiance !`;
+    let expiryText = "";
+    if (createdPayment.expires_at) {
+      try {
+        const d = new Date(createdPayment.expires_at);
+        const formatted = d.toLocaleDateString("fr-FR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        expiryText = `\n⏳ Date limite de validité : ${formatted}`;
+      } catch {}
+    }
+    const feeText =
+      createdPayment.fee_bearer === "freelance"
+        ? "\n🎁 Frais de transaction offerts par le prestataire."
+        : "";
+    const message = `Bonjour ${createdPayment.client_name},\n\nVoici votre lien de paiement sécurisé pour la prestation "${createdPayment.service_name}" :\n👉 ${createdPayment.url}\n\nMontant total : ${formatAmount(createdPayment.amount_total)}${feeText}${expiryText}\nRèglement possible par Wave, Orange Money, MTN MoMo ou Moov Money.\n\nMerci pour votre confiance !`;
     window.open(
       `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`,
       "_blank",
@@ -268,6 +350,49 @@ export default function NewPaymentLinkPage() {
                     {formatAmount(createdPayment.amount_net)}
                   </span>
                 </div>
+              </div>
+
+              {/* Badges Validité, Type d'usage & Répartition des frais */}
+              <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                {/* Badge Répartition des frais */}
+                {createdPayment.fee_bearer === "freelance" ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    <BadgePercent className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Frais offerts au client (déduits de votre net)</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                    <BadgePercent className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Frais supportés par le client (+1% + 100 F)</span>
+                  </span>
+                )}
+
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                  {createdPayment.expires_at ? (
+                    <span>
+                      Expire le{" "}
+                      {new Date(createdPayment.expires_at).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  ) : (
+                    <span>Validité illimitée</span>
+                  )}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                  <Repeat className="w-3.5 h-3.5 text-zinc-400" />
+                  {createdPayment.is_single_use ? (
+                    <span>Usage unique (1 paiement max)</span>
+                  ) : (
+                    <span>Multi-usage ({createdPayment.max_uses} utilisations max)</span>
+                  )}
+                </span>
               </div>
 
               {/* Champ Lien avec bouton copie */}
@@ -430,16 +555,99 @@ export default function NewPaymentLinkPage() {
                 />
               </div>
 
-              {/* Champ 4 : Montant Net Souhaité */}
+              {/* Champ 3bis : Répartition des frais de transaction (Client vs Freelance) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                    <BadgePercent className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Prise en charge des frais (1% + 100 FCFA)</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-zinc-400">
+                    {feeBearer === "client" ? "Frais additionnels client" : "Frais inclus & offerts"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Option 1 : Client supporte les frais */}
+                  <button
+                    type="button"
+                    onClick={() => setFeeBearer("client")}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      feeBearer === "client"
+                        ? "bg-emerald-500/10 border-emerald-500/50 text-white ring-1 ring-emerald-500/30"
+                        : "bg-black border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">À la charge du client (défaut)</span>
+                      <span
+                        className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
+                          feeBearer === "client"
+                            ? "border-emerald-400 bg-emerald-400"
+                            : "border-zinc-600"
+                        }`}
+                      >
+                        {feeBearer === "client" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-1 leading-relaxed">
+                      Le client paie les frais en plus. Votre net perçu reste exact à 100%.
+                    </p>
+                  </button>
+
+                  {/* Option 2 : Freelance supporte les frais */}
+                  <button
+                    type="button"
+                    onClick={() => setFeeBearer("freelance")}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      feeBearer === "freelance"
+                        ? "bg-emerald-500/10 border-emerald-500/50 text-white ring-1 ring-emerald-500/30"
+                        : "bg-black border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">À ma charge (frais offerts)</span>
+                      <span
+                        className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
+                          feeBearer === "freelance"
+                            ? "border-emerald-400 bg-emerald-400"
+                            : "border-zinc-600"
+                        }`}
+                      >
+                        {feeBearer === "freelance" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-1 leading-relaxed">
+                      Le client paie exactement le prix affiché. Les frais sont déduits de votre solde.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Champ 4 : Montant */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
                     <Coins className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Montant Net souhaité (ce que vous touchez)</span>
+                    <span>
+                      {feeBearer === "client"
+                        ? "Montant Net souhaité (ce que vous touchez)"
+                        : "Prix de la prestation (facturé au client)"}
+                    </span>
                     <span className="text-rose-400">*</span>
                   </label>
-                  <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                    Net garanti
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                      feeBearer === "client"
+                        ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+                        : "text-amber-400 bg-amber-500/10 border-amber-500/30"
+                    }`}
+                  >
+                    {feeBearer === "client" ? "Net garanti 100%" : "Frais déduits"}
                   </span>
                 </div>
                 <div className="relative">
@@ -478,6 +686,167 @@ export default function NewPaymentLinkPage() {
                 </div>
               </div>
 
+              {/* ═══ Validité Temporelle & Type d'usage ═══ */}
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4 sm:p-5 space-y-4">
+                {/* 1. Durée de validité */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Durée de validité du lien</span>
+                    </label>
+                    <span className="text-[10px] text-zinc-400">
+                      {calculatedExpiresAt ? (
+                        <span className="text-emerald-400 font-medium">
+                          Expire le {calculatedExpiresAt.toLocaleDateString("fr-FR", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      ) : (
+                        <span>Sans limite de validité</span>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                    {[
+                      { id: "24h", label: "24h" },
+                      { id: "48h", label: "48h" },
+                      { id: "7d", label: "7 jours" },
+                      { id: "30d", label: "30 jours" },
+                      { id: "custom", label: "Date..." },
+                      { id: "never", label: "Illimité" },
+                    ].map((item) => {
+                      const active = validityPreset === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setValidityPreset(item.id)}
+                          className={`h-9 px-2 text-xs font-bold rounded-xl transition-all duration-150 flex items-center justify-center border ${
+                            active
+                              ? "bg-emerald-500 text-black border-emerald-400 shadow-md shadow-emerald-500/20"
+                              : "bg-black text-zinc-400 hover:text-white hover:bg-zinc-900 border-white/10"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Date & Heure personnalisées si 'custom' */}
+                  {validityPreset === "custom" && (
+                    <div className="pt-2 animate-slide-up">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <input
+                          type="datetime-local"
+                          value={customExpiresAt}
+                          onChange={(e) => setCustomExpiresAt(e.target.value)}
+                          min={new Date().toISOString().slice(0, 16)}
+                          required={validityPreset === "custom"}
+                          className="w-full h-10 px-3 text-xs rounded-xl bg-black border border-emerald-500/40 text-white outline-none focus:border-emerald-400 [color-scheme:dark]"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
+                {/* 2. Type d'utilisation : Unique ou Multiple */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                    <Repeat className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Type d'utilisation</span>
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Option 1 : Usage unique */}
+                    <button
+                      type="button"
+                      onClick={() => setIsSingleUse(true)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        isSingleUse
+                          ? "bg-emerald-500/10 border-emerald-500/50 text-white ring-1 ring-emerald-500/30"
+                          : "bg-black border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">Usage unique (défaut)</span>
+                        <span
+                          className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
+                            isSingleUse
+                              ? "border-emerald-400 bg-emerald-400"
+                              : "border-zinc-600"
+                          }`}
+                        >
+                          {isSingleUse && <span className="h-1.5 w-1.5 rounded-full bg-black" />}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-1 leading-relaxed">
+                        Le lien se désactive automatiquement dès le premier paiement validé.
+                      </p>
+                    </button>
+
+                    {/* Option 2 : Usage multiple */}
+                    <button
+                      type="button"
+                      onClick={() => setIsSingleUse(false)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        !isSingleUse
+                          ? "bg-emerald-500/10 border-emerald-500/50 text-white ring-1 ring-emerald-500/30"
+                          : "bg-black border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">Usage multiple</span>
+                        <span
+                          className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
+                            !isSingleUse
+                              ? "border-emerald-400 bg-emerald-400"
+                              : "border-zinc-600"
+                          }`}
+                        >
+                          {!isSingleUse && <span className="h-1.5 w-1.5 rounded-full bg-black" />}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-1 leading-relaxed">
+                        Autorise plusieurs paiements jusqu'à concurrence du quota fixé.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Paramétrage du quota d'utilisations si usage multiple */}
+                  {!isSingleUse && (
+                    <div className="pt-2 flex items-center gap-3 animate-slide-up bg-black p-3 rounded-xl border border-white/10">
+                      <div className="flex-1">
+                        <span className="text-xs font-bold text-zinc-200 block">
+                          Nombre maximal de paiements autorisés :
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          Le lien se fermera automatiquement une fois ce quota atteint
+                        </span>
+                      </div>
+                      <div className="w-24">
+                        <input
+                          type="number"
+                          min="2"
+                          max="9999"
+                          value={maxUses}
+                          onChange={(e) => setMaxUses(e.target.value)}
+                          className="w-full h-9 px-2 text-center text-xs font-bold rounded-lg bg-zinc-900 border border-emerald-500/40 text-white outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* ═══ Calculateur en temps réel ═══ */}
               <div className="rounded-2xl bg-black/60 text-white p-5 border border-emerald-500/20 shadow-md space-y-3.5">
                 <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
@@ -490,44 +859,84 @@ export default function NewPaymentLinkPage() {
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">
-                    Frais = Total - Net
+                    {feeBearer === "client" ? "Frais payés par le client" : "Frais offerts au client"}
                   </span>
                 </div>
 
                 <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Montant Net (versé sur votre compte)
-                    </span>
-                    <span className="font-semibold text-white">
-                      {formatAmount(calculations.net)}
-                    </span>
-                  </div>
+                  {feeBearer === "client" ? (
+                    <>
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Montant Net (versé sur votre compte)
+                        </span>
+                        <span className="font-semibold text-white">
+                          {formatAmount(calculations.net)}
+                        </span>
+                      </div>
 
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                      Frais client (passerelle GeniusPay)
-                    </span>
-                    <span className="font-semibold text-amber-400">
-                      + {formatAmount(calculations.fees)}
-                    </span>
-                  </div>
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          Frais client (passerelle GeniusPay)
+                        </span>
+                        <span className="font-semibold text-amber-400">
+                          + {formatAmount(calculations.fees)}
+                        </span>
+                      </div>
 
-                  <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs uppercase font-extrabold tracking-wider text-zinc-200">
-                        Total à payer par le client
-                      </span>
-                      <p className="text-[10px] text-zinc-400">
-                        Montant net garanti à 100% pour vous
-                      </p>
-                    </div>
-                    <span className="text-lg sm:text-xl font-black text-emerald-400 tracking-tight">
-                      {formatAmount(calculations.total)}
-                    </span>
-                  </div>
+                      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs uppercase font-extrabold tracking-wider text-zinc-200">
+                            Total à payer par le client
+                          </span>
+                          <p className="text-[10px] text-zinc-400">
+                            Montant net garanti à 100% pour vous
+                          </p>
+                        </div>
+                        <span className="text-lg sm:text-xl font-black text-emerald-400 tracking-tight">
+                          {formatAmount(calculations.total)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Tarif prestation (payé par le client)
+                        </span>
+                        <span className="font-semibold text-white">
+                          {formatAmount(calculations.total)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          Frais de transaction prélevés (1% + 100 F)
+                        </span>
+                        <span className="font-semibold text-amber-400">
+                          - {formatAmount(calculations.fees)}
+                        </span>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs uppercase font-extrabold tracking-wider text-zinc-200">
+                            Montant Net versé sur votre compte
+                          </span>
+                          <p className="text-[10px] text-zinc-400">
+                            Le client ne paie aucun frais supplémentaire
+                          </p>
+                        </div>
+                        <span className="text-lg sm:text-xl font-black text-emerald-400 tracking-tight">
+                          {formatAmount(calculations.net)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

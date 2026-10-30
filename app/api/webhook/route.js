@@ -192,30 +192,49 @@ export async function POST(request) {
 
     // 5. Application idempotente dans Supabase
     if (isSuccess) {
-      // Met à jour vers 'paye' UNIQUEMENT si le paiement n'est pas déjà payé
+      // 1. Récupération des données actuelles du paiement
+      const { data: currentPayment, error: fetchErr } = await supabaseAdmin
+        .from('payments')
+        .select('id, status, is_single_use, max_uses, times_used')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchErr || !currentPayment) {
+        console.error('[Webhook] Paiement introuvable pour validation :', fetchErr);
+        return NextResponse.json({ error: 'Paiement introuvable.' }, { status: 404 });
+      }
+
+      const isSingleUse = currentPayment.is_single_use !== false;
+      const currentTimesUsed = Number(currentPayment.times_used) || 0;
+      const maxUses = Number(currentPayment.max_uses) || 1;
+
+      // Protection d'idempotence si le paiement est à usage unique et déjà payé
+      if (isSingleUse && currentPayment.status === 'paye' && currentTimesUsed >= 1) {
+        console.info(`[Webhook - Idempotence] Le paiement ${paymentId} est déjà réglé.`);
+        return NextResponse.json(
+          { received: true, status: 'already_paid' },
+          { status: 200 }
+        );
+      }
+
+      const newTimesUsed = currentTimesUsed + 1;
+      const shouldClose = isSingleUse || newTimesUsed >= maxUses;
+
       const { data: updated, error: updateError } = await supabaseAdmin
         .from('payments')
         .update({
-          status: 'paye',
+          status: shouldClose ? 'paye' : currentPayment.status,
+          times_used: newTimesUsed,
           payment_method: provider,
           geniuspay_ref: transactionReference || undefined,
+          paid_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', paymentId)
-        .neq('status', 'paye')
         .select()
         .single();
 
       if (updateError) {
-        // Si code PGRST116, la ligne était déjà 'paye' (idempotence)
-        if (updateError.code === 'PGRST116') {
-          console.info(`[Webhook - Idempotence] Le paiement ${paymentId} est déjà réglé.`);
-          return NextResponse.json(
-            { received: true, status: 'already_paid' },
-            { status: 200 }
-          );
-        }
-
         console.error('[Webhook] Erreur mise à jour paiement payé :', updateError);
         return NextResponse.json(
           { error: 'Erreur mise à jour base de données.' },
@@ -223,9 +242,9 @@ export async function POST(request) {
         );
       }
 
-      console.info(`[Webhook - Succès] Paiement ${paymentId} validé avec succès (${provider}).`);
+      console.info(`[Webhook - Succès] Paiement ${paymentId} validé avec succès (${provider}). Utilisations: ${newTimesUsed}/${maxUses}.`);
       return NextResponse.json(
-        { received: true, status: 'success', payment_id: paymentId },
+        { received: true, status: 'success', payment_id: paymentId, times_used: newTimesUsed },
         { status: 200 }
       );
     }

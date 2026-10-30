@@ -32,6 +32,7 @@ import {
   exportTransactionsToCSV,
   generateReceiptPDF,
 } from "@/lib/exportUtils";
+import NotificationBell from "@/components/NotificationBell";
 import {
   Area,
   AreaChart,
@@ -80,6 +81,14 @@ const txIsPending = (tx) =>
 
 const txIsToVerify = (tx) =>
   tx.status === "a_verifier" || tx.statut === "a_verifier";
+
+const txIsExpired = (tx) => {
+  if (tx.status === "expire" || tx.statut === "expire") return true;
+  if (!txIsPaid(tx) && tx.expires_at) {
+    return new Date() > new Date(tx.expires_at);
+  }
+  return false;
+};
 
 const dateOf = (tx) => {
   const date = new Date(tx.created_at);
@@ -168,6 +177,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadTransactions();
+  }, [loadTransactions]);
+
+  // Actualisation temps réel instantanée sans rechargement de page
+  useEffect(() => {
+    const handleRealtimePayment = () => {
+      loadTransactions(false); // Rafraîchissement silencieux sans spinner plein écran
+    };
+    window.addEventListener("kadmiel:payment-event", handleRealtimePayment);
+    return () => {
+      window.removeEventListener("kadmiel:payment-event", handleRealtimePayment);
+    };
   }, [loadTransactions]);
 
   // Filtrage avancé par période (Aujourd'hui, Cette semaine, Ce mois, Année, Personnalisé avec dates)
@@ -316,8 +336,9 @@ export default function DashboardPage() {
     return periodTransactions.filter((tx) => {
       // 1. Filtre par statut
       if (statusFilter === "paye" && !txIsPaid(tx)) return false;
-      if (statusFilter === "en_attente" && !txIsPending(tx)) return false;
+      if (statusFilter === "en_attente" && (!txIsPending(tx) || txIsExpired(tx))) return false;
       if (statusFilter === "a_verifier" && !txIsToVerify(tx)) return false;
+      if (statusFilter === "expire" && !txIsExpired(tx)) return false;
       if (
         statusFilter === "echoue" &&
         tx.status !== "echoue" &&
@@ -392,9 +413,13 @@ export default function DashboardPage() {
         txAmountTotal(tx)
       )} pour la prestation "${service}" a bien été confirmé.\nMerci pour votre confiance !`;
     } else {
+      const feeText =
+        tx.fee_bearer === "freelance"
+          ? "\n🎁 Frais de transaction offerts par le prestataire."
+          : "";
       message = `Bonjour ${name},\n\nVoici votre lien de paiement sécurisé pour la prestation "${service}" :\n👉 ${link}\n\nMontant total : ${formatAmount(
         txAmountTotal(tx)
-      )}\nRèglement disponible par Wave, Orange Money, MTN ou Moov.\nMerci !`;
+      )}${feeText}\nRèglement disponible par Wave, Orange Money, MTN ou Moov.\nMerci !`;
     }
 
     const cleanPhone = phone.replace(/[^\d]/g, "");
@@ -628,14 +653,18 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Bouton Nouveau Lien (Action Principale) */}
-          <Link
-            href="/dashboard/new"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400 shrink-0 active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nouveau lien</span>
-          </Link>
+          {/* Actions rapides : Cloche de Notifications In-App + Bouton Nouveau Lien */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <NotificationBell />
+
+            <Link
+              href="/dashboard/new"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-extrabold text-black transition shadow-lg shadow-emerald-500/25 border border-emerald-400 shrink-0 active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouveau lien</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -924,7 +953,7 @@ export default function DashboardPage() {
               {
                 id: "en_attente",
                 label: "En attente",
-                count: periodTransactions.filter(txIsPending).length,
+                count: periodTransactions.filter((tx) => txIsPending(tx) && !txIsExpired(tx)).length,
               },
               {
                 id: "paye",
@@ -932,10 +961,15 @@ export default function DashboardPage() {
                 count: periodTransactions.filter(txIsPaid).length,
               },
               {
+                id: "expire",
+                label: "Expirés",
+                count: periodTransactions.filter(txIsExpired).length,
+              },
+              {
                 id: "echoue",
                 label: "Échoués",
                 count: periodTransactions.filter(
-                  (tx) => tx.status === "echoue" || tx.statut === "echoue"
+                  (tx) => (tx.status === "echoue" || tx.statut === "echoue") && !txIsExpired(tx)
                 ).length,
               },
             ].map(({ id, label, count, highlight }) => {
@@ -997,6 +1031,7 @@ export default function DashboardPage() {
                   const isPaid = txIsPaid(tx);
                   const isPending = txIsPending(tx);
                   const isToVerify = txIsToVerify(tx);
+                  const isExpired = txIsExpired(tx);
                   const service = txService(tx);
                   const total = txAmountTotal(tx);
                   const net = txAmountNet(tx);
@@ -1030,9 +1065,20 @@ export default function DashboardPage() {
                       {/* Service */}
                       <td className="px-4 py-3.5 text-xs text-zinc-300">
                         <span className="font-medium text-white">{service}</span>
-                        <span className="block text-[10px] text-zinc-500">
-                          Net : {formatAmount(net)}
-                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[10px] text-zinc-500">
+                            Net : {formatAmount(net)}
+                          </span>
+                          {tx.fee_bearer === "freelance" ? (
+                            <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+                              Frais offerts
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-zinc-400 bg-zinc-850 border border-zinc-700/80 px-1.5 py-0.2 rounded">
+                              Frais client
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Montant Total */}
@@ -1048,6 +1094,11 @@ export default function DashboardPage() {
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                               Payé
                             </span>
+                          ) : isExpired ? (
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                              Expiré
+                            </span>
                           ) : isToVerify ? (
                             <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
                               <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
@@ -1059,9 +1110,20 @@ export default function DashboardPage() {
                               En attente
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
                               Échoué
+                            </span>
+                          )}
+
+                          {/* Badge Type d'usage & Quota */}
+                          {tx.is_single_use === false ? (
+                            <span className="block text-[10px] text-zinc-400 font-mono">
+                              Multi ({tx.times_used || 0}/{tx.max_uses || 1})
+                            </span>
+                          ) : (
+                            <span className="block text-[10px] text-zinc-500">
+                              Usage unique
                             </span>
                           )}
 
