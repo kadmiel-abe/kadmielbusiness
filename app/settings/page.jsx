@@ -274,10 +274,17 @@ export default function SettingsPage() {
 
       // 3. Mise à jour de l'état local
       setProfile((prev) => ({ ...prev, avatar_url: data.avatar_url }));
+      try {
+        localStorage.setItem("kadmiel_admin_avatar", data.avatar_url);
+      } catch {}
       setProfileSuccessMessage("Votre photo de profil a été mise à jour avec succès !");
 
       // 4. Notification en temps réel pour synchroniser la barre latérale et le menu mobile
-      window.dispatchEvent(new Event("kadmiel:profile_updated"));
+      window.dispatchEvent(
+        new CustomEvent("kadmiel:profile_updated", {
+          detail: { avatar_url: data.avatar_url },
+        })
+      );
     } catch (err) {
       console.error("Erreur téléversement avatar :", err);
       setProfileErrorMessage(err.message || "Erreur lors du téléversement de la photo.");
@@ -309,8 +316,15 @@ export default function SettingsPage() {
       }
 
       setProfile((prev) => ({ ...prev, avatar_url: data.avatar_url }));
+      try {
+        localStorage.setItem("kadmiel_admin_avatar", data.avatar_url);
+      } catch {}
       setProfileSuccessMessage("Avatar mis à jour avec succès !");
-      window.dispatchEvent(new Event("kadmiel:profile_updated"));
+      window.dispatchEvent(
+        new CustomEvent("kadmiel:profile_updated", {
+          detail: { avatar_url: data.avatar_url },
+        })
+      );
     } catch (err) {
       setProfileErrorMessage(err.message || "Erreur lors de la sélection de l'avatar.");
     } finally {
@@ -337,8 +351,15 @@ export default function SettingsPage() {
       }
 
       setProfile((prev) => ({ ...prev, avatar_url: "" }));
+      try {
+        localStorage.removeItem("kadmiel_admin_avatar");
+      } catch {}
       setProfileSuccessMessage("Photo de profil retirée. Vos initiales sont désormais affichées.");
-      window.dispatchEvent(new Event("kadmiel:profile_updated"));
+      window.dispatchEvent(
+        new CustomEvent("kadmiel:profile_updated", {
+          detail: { avatar_url: "" },
+        })
+      );
     } catch (err) {
       setProfileErrorMessage(err.message || "Erreur lors de la suppression de la photo.");
     } finally {

@@ -40,16 +40,55 @@ export default function DashboardLayoutShell({ children }) {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [adminUser, setAdminUser] = useState(null);
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [customAvatar, setCustomAvatar] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   // Charger le profil de l'utilisateur administrateur
   useEffect(() => {
+    // 1. Initialiser immédiatement depuis le stockage local si disponible
+    if (typeof window !== "undefined") {
+      const cachedAvatar = localStorage.getItem("kadmiel_admin_avatar");
+      if (cachedAvatar) {
+        setCustomAvatar(cachedAvatar);
+      }
+    }
+
     async function loadUser() {
       try {
+        // A. Récupérer les données fraîches depuis l'API Settings
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.profile) {
+            setAdminProfile(data.profile);
+            if (data.profile.avatar_url) {
+              setCustomAvatar(data.profile.avatar_url);
+              try {
+                localStorage.setItem("kadmiel_admin_avatar", data.profile.avatar_url);
+              } catch {}
+            } else {
+              setCustomAvatar("");
+              try {
+                localStorage.removeItem("kadmiel_admin_avatar");
+              } catch {}
+            }
+            return;
+          }
+        }
+
+        // B. Secours via supabase.auth.getUser()
         const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session?.user) {
-          setAdminUser(session.user);
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          setAdminUser(user);
+          if (user.user_metadata?.avatar_url) {
+            setCustomAvatar(user.user_metadata.avatar_url);
+            try {
+              localStorage.setItem("kadmiel_admin_avatar", user.user_metadata.avatar_url);
+            } catch {}
+          }
         }
       } catch (err) {
         console.error("Erreur chargement profil admin layout:", err);
@@ -58,7 +97,11 @@ export default function DashboardLayoutShell({ children }) {
     loadUser();
 
     // Réagir aux mises à jour du profil depuis la page Réglages
-    const handleProfileUpdate = () => {
+    const handleProfileUpdate = (e) => {
+      setAvatarError(false);
+      if (e?.detail?.avatar_url !== undefined) {
+        setCustomAvatar(e.detail.avatar_url);
+      }
       loadUser();
     };
     window.addEventListener("kadmiel:profile_updated", handleProfileUpdate);
@@ -69,17 +112,29 @@ export default function DashboardLayoutShell({ children }) {
   }, [supabase]);
 
   const adminName =
+    adminProfile?.full_name ||
     adminUser?.user_metadata?.full_name ||
     adminUser?.user_metadata?.name ||
     adminUser?.email?.split("@")[0] ||
     "Administrateur";
-  const avatarUrl = adminUser?.user_metadata?.avatar_url || null;
-  const adminInitials = adminName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+
+  // URL validée : priorité au customAvatar, adminProfile ou user_metadata
+  const rawAvatarUrl =
+    customAvatar !== null
+      ? customAvatar
+      : adminProfile?.avatar_url || adminUser?.user_metadata?.avatar_url || "";
+  const avatarUrl =
+    !avatarError && rawAvatarUrl && typeof rawAvatarUrl === "string" && rawAvatarUrl.trim().length > 0
+      ? rawAvatarUrl.trim()
+      : null;
+
+  const adminInitials =
+    adminName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "K";
 
   // Fermer le drawer mobile lors du changement de route
   useEffect(() => {
@@ -238,21 +293,25 @@ export default function DashboardLayoutShell({ children }) {
                   : "bg-zinc-950/80 hover:bg-zinc-900 border-zinc-800/80 hover:border-emerald-500/30 text-zinc-300"
               } ${isDesktopCollapsed ? "justify-center p-2" : ""}`}
             >
-              <div className="relative h-9 w-9 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-950 border border-emerald-500/40 flex items-center justify-center font-black text-white text-xs shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                {avatarUrl ? (
+              <div className="relative h-9 w-9 shrink-0 rounded-xl overflow-hidden bg-emerald-500 border border-emerald-400/40 flex items-center justify-center font-black text-black text-xs shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                {/* Initiale par défaut "K" sur fond vert */}
+                <span className="font-black text-black text-xs select-none">
+                  {adminInitials || "K"}
+                </span>
+
+                {/* Si l'URL de la photo de profil existe et n'est pas vide, afficher la balise img */}
+                {avatarUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={avatarUrl}
-                    alt={adminName}
-                    className="h-full w-full object-cover"
+                    alt="Profil"
+                    className="absolute inset-0 w-full h-full object-cover rounded-xl"
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      e.target.style.display = "none";
                     }}
                   />
-                ) : (
-                  <span>{adminInitials}</span>
                 )}
-                <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 border border-black ring-1 ring-emerald-500" />
+                <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 border border-black ring-1 ring-emerald-500 z-10" />
               </div>
 
               {!isDesktopCollapsed && (
@@ -338,19 +397,20 @@ export default function DashboardLayoutShell({ children }) {
                   : "bg-zinc-950 border-emerald-500/20 text-zinc-300 hover:text-emerald-400 hover:bg-emerald-500/10"
               }`}
             >
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt={adminName}
-                  className="h-6 w-6 rounded-lg object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <Settings2 className="h-4 w-4" />
-              )}
+              <div className="relative h-7 w-7 rounded-lg overflow-hidden bg-emerald-500 flex items-center justify-center font-black text-black text-[11px]">
+                <span className="font-black text-black select-none">{adminInitials || "K"}</span>
+                {avatarUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt="Profil"
+                    className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                )}
+              </div>
             </Link>
             <button
               type="button"
@@ -455,21 +515,20 @@ export default function DashboardLayoutShell({ children }) {
                       : "bg-zinc-950 border-zinc-800 hover:border-emerald-500/30 text-zinc-300"
                   }`}
                 >
-                  <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-950 border border-emerald-500/30 flex items-center justify-center font-bold text-white text-xs">
-                    {avatarUrl ? (
+                  <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-emerald-500 border border-emerald-400/40 flex items-center justify-center font-black text-black text-xs">
+                    <span className="font-black text-black select-none">{adminInitials || "K"}</span>
+                    {avatarUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={avatarUrl}
-                        alt={adminName}
-                        className="h-full w-full object-cover"
+                        alt="Profil"
+                        className="absolute inset-0 w-full h-full object-cover rounded-xl"
                         onError={(e) => {
-                          e.currentTarget.style.display = "none";
+                          e.target.style.display = "none";
                         }}
                       />
-                    ) : (
-                      <span>{adminInitials}</span>
                     )}
-                    <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-black" />
+                    <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-black z-10" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-white truncate">{adminName}</p>
