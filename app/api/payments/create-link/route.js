@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getFeeSettings, calculatePaymentAmounts } from '@/lib/pricing';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -7,16 +8,30 @@ export const dynamic = 'force-dynamic';
 /**
  * Route POST /api/payments/create-link
  * Crée un client (ou réutilise un existant) et insère le paiement dans Supabase.
- * Contourne les RLS de manière sécurisée côté serveur.
+ * Calcule et garantit le respect de la formule officielle GeniusPay côté serveur :
+ * total_amount = Math.ceil((net_amount + fixed_fee) / (1 - rate))
+ * fee_amount = total_amount - net_amount
  */
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { id, client_name, client_phone, service_name, amount_net, amount_total, expires_at, is_single_use, max_uses, fee_bearer, business_type } = body || {};
+    const {
+      id,
+      client_name,
+      client_phone,
+      service_name,
+      amount_net,
+      amount_total,
+      expires_at,
+      is_single_use,
+      max_uses,
+      fee_bearer,
+      business_type,
+    } = body || {};
 
-    if (!client_name || !client_phone || !service_name || !amount_net || !amount_total) {
+    if (!client_name || !client_phone || !service_name || !amount_net) {
       return NextResponse.json(
-        { error: 'Tous les champs obligatoires doivent être renseignés.' },
+        { error: 'Tous les champs obligatoires (nom, téléphone, prestation, montant net) doivent être renseignés.' },
         { status: 400 }
       );
     }
@@ -55,11 +70,22 @@ export async function POST(request) {
       }
     }
 
-    // 2. Traitement de la validité et de l'usage
+    // 2. Traitement des frais selon la formule officielle GeniusPay
+    const feeSettings = await getFeeSettings();
+    const computedFeeBearer = fee_bearer === 'freelance' ? 'freelance' : 'client';
+    const calculated = calculatePaymentAmounts(amount_net, {
+      rate: feeSettings.rate,
+      fixedFee: feeSettings.fixedFee,
+      feeBearer: computedFeeBearer,
+    });
+
+    const finalAmountNet = calculated.net_amount;
+    const finalAmountTotal = calculated.total_amount;
+    const finalFeeAmount = calculated.fee_amount;
+
     const isSingleUse = is_single_use !== false;
     const computedMaxUses = isSingleUse ? 1 : Math.max(1, parseInt(max_uses, 10) || 1);
     const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
-    const computedFeeBearer = fee_bearer === 'freelance' ? 'freelance' : 'client';
     const computedBusinessType = business_type === 'restaurant' ? 'restaurant' : 'freelance';
 
     // 3. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
@@ -68,8 +94,9 @@ export async function POST(request) {
       id: paymentId,
       client_id: clientId,
       service_name: service_name.trim(),
-      amount_net: Number(amount_net),
-      amount_total: Number(amount_total),
+      amount_net: finalAmountNet,
+      amount_total: finalAmountTotal,
+      fee_amount: finalFeeAmount,
       status: 'en_attente',
       business_type: computedBusinessType,
       expires_at: computedExpiresAt,

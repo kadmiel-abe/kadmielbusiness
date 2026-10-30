@@ -74,6 +74,7 @@ export default function PublicPaymentPage() {
 
   // État du bouton de paiement GeniusPay
   const [payingGenius, setPayingGenius] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState(null);
   const [payError, setPayError] = useState(null);
 
   // États pour l'envoi automatique du reçu
@@ -167,8 +168,11 @@ export default function PublicPaymentPage() {
     return () => clearInterval(interval);
   }, [paymentId]);
 
-  // 2. Initialisation de la session GeniusPay et redirection
-  const handlePayGenius = async () => {
+  // 2. Initialisation de la session GeniusPay (support multi-opérateur)
+  const handlePayGenius = async (operator = null) => {
+    const targetProvider = operator || selectedProvider;
+    if (operator) setSelectedProvider(operator);
+
     setPayError(null);
     setPayingGenius(true);
 
@@ -176,7 +180,10 @@ export default function PublicPaymentPage() {
       const res = await fetch("/api/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentId }),
+        body: JSON.stringify({
+          paymentId,
+          provider: targetProvider || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -692,36 +699,52 @@ export default function PublicPaymentPage() {
                       accent: "text-[#0089cf]",
                       border: "border-[#0089cf]/30 hover:border-[#0089cf] hover:bg-[#0089cf]/10",
                     },
-                  ].map((op) => (
-                    <button
-                      key={op.id}
-                      type="button"
-                      onClick={handlePayGenius}
-                      disabled={payingGenius}
-                      className={`p-3 rounded-2xl border ${op.border} bg-slate-950/80 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:opacity-50 shadow-sm`}
-                    >
-                      <span className="text-xl">{op.icon}</span>
-                      <span className={`text-xs font-bold ${op.accent}`}>{op.name}</span>
-                      <span className="text-[9px] text-slate-500 font-medium">Côte d'Ivoire</span>
-                    </button>
-                  ))}
+                  ].map((op) => {
+                    const isSelected = selectedProvider === op.id;
+                    return (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => handlePayGenius(op.id)}
+                        disabled={payingGenius}
+                        className={`p-3 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:opacity-50 shadow-sm ${
+                          isSelected
+                            ? "border-emerald-400 bg-emerald-500/15 ring-2 ring-emerald-400/50"
+                            : `${op.border} bg-slate-950/80`
+                        }`}
+                      >
+                        <span className="text-xl">{op.icon}</span>
+                        <span className={`text-xs font-bold ${op.accent}`}>{op.name}</span>
+                        <span className="text-[9px] text-slate-500 font-medium">Côte d'Ivoire</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Bouton de confirmation principal */}
                 <button
-                  onClick={handlePayGenius}
+                  onClick={() => handlePayGenius()}
                   disabled={payingGenius}
                   className="w-full h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] disabled:opacity-60 text-slate-950 font-black text-sm transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
                 >
                   {payingGenius ? (
                     <>
                       <div className="animate-spin h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full" />
-                      <span>Connexion sécurisée à la passerelle...</span>
+                      <span>
+                        Connexion sécurisée{" "}
+                        {selectedProvider
+                          ? `(${selectedProvider.toUpperCase()})`
+                          : "GeniusPay"}
+                        ...
+                      </span>
                     </>
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-slate-950" />
-                      <span>Payer {formatAmount(payment.amount_total)}</span>
+                      <span>
+                        Payer {formatAmount(payment.amount_total)}
+                        {selectedProvider ? ` avec ${selectedProvider.toUpperCase()}` : ""}
+                      </span>
                       <ArrowRight className="w-4 h-4 text-slate-950" />
                     </>
                   )}

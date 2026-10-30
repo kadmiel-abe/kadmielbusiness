@@ -639,18 +639,27 @@ export default function DashboardPage() {
     }
   };
 
-  // Mettre à jour le statut (Validation manuelle ou Rejet)
+  // Mettre à jour le statut (Validation manuelle ou Rejet via endpoint de secours)
   const updatePaymentStatus = async (tx, newStatus) => {
     setActionError("");
     setUpdatingId(tx.id);
     try {
-      const res = await fetch("/api/payments", {
+      const isManualSecours = txIsToVerify(tx);
+      const endpoint = isManualSecours ? "/api/manual-verify" : "/api/payments";
+      const payload = isManualSecours
+        ? {
+            paymentId: tx.id,
+            action: newStatus === "paye" ? "validate" : "reject",
+          }
+        : { id: tx.id, status: newStatus };
+
+      const res = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: tx.id, status: newStatus }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!res.ok || (!json.success && !json.received)) {
         throw new Error(json.error || "Impossible de mettre à jour le statut.");
       }
 
