@@ -17,6 +17,7 @@ import {
   X,
   PlusCircle,
   ShieldCheck,
+  TrendingUp,
 } from "lucide-react";
 import { NotificationProvider } from "@/context/NotificationContext";
 import NotificationBell from "@/components/NotificationBell";
@@ -24,6 +25,7 @@ import PaymentAlertToast from "@/components/PaymentAlertToast";
 
 const navigation = [
   { label: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Statistiques & Pilotage", href: "/analytics", icon: TrendingUp },
   { label: "Nouveau lien", href: "/dashboard/new", icon: PlusCircle },
   { label: "Transactions", href: "/dashboard#transactions", icon: ArrowLeftRight },
   { label: "Répertoire Clients", href: "/clients", icon: Users },

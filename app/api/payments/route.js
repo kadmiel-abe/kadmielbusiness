@@ -111,8 +111,9 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { id, status, statut } = body || {};
+    const { id, status, statut, payment_method, paymentMethod } = body || {};
     const newStatus = status || statut;
+    const methodToSave = payment_method || paymentMethod;
 
     if (!id || !newStatus) {
       return NextResponse.json(
@@ -124,7 +125,7 @@ export async function PATCH(request) {
     // Récupération des informations de validité et d'usage actuelles
     const { data: currentPayment } = await supabaseAdmin
       .from('payments')
-      .select('id, status, is_single_use, max_uses, times_used')
+      .select('id, status, is_single_use, max_uses, times_used, payment_method')
       .eq('id', id)
       .single();
 
@@ -142,6 +143,9 @@ export async function PATCH(request) {
     };
     if (newStatus === 'paye') {
       updatePayload.paid_at = new Date().toISOString();
+      if (methodToSave) {
+        updatePayload.payment_method = methodToSave;
+      }
     }
 
     const { data: updated, error } = await supabaseAdmin

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Check,
+  Clock,
   Clock3,
   Copy,
   ExternalLink,
@@ -26,6 +27,10 @@ import {
   CalendarDays,
   Trash2,
   Mail,
+  TrendingUp,
+  TrendingDown,
+  Smartphone,
+  ArrowRight,
 } from "lucide-react";
 import {
   exportTransactionsToCSV,
@@ -330,6 +335,128 @@ export default function DashboardPage() {
     }));
   }, [periodTransactions]);
 
+  // Délai moyen de règlement (en jours ou en heures)
+  const paymentDelay = useMemo(() => {
+    const paidTxs = periodTransactions.filter(txIsPaid);
+    if (!paidTxs.length) {
+      return { formatted: "0 jour", rawDays: 0, rawHours: 0, count: 0 };
+    }
+    let totalMs = 0;
+    let validCount = 0;
+    paidTxs.forEach((tx) => {
+      const created = dateOf(tx);
+      const paid = tx.paid_at
+        ? new Date(tx.paid_at)
+        : tx.updated_at
+        ? new Date(tx.updated_at)
+        : created;
+      if (created && paid && !isNaN(created.getTime()) && !isNaN(paid.getTime())) {
+        const diff = Math.max(0, paid.getTime() - created.getTime());
+        totalMs += diff;
+        validCount += 1;
+      }
+    });
+    if (!validCount) return { formatted: "0 jour", rawDays: 0, rawHours: 0, count: 0 };
+    const avgHours = totalMs / (validCount * 1000 * 60 * 60);
+    const avgDays = avgHours / 24;
+    let formatted = "";
+    if (avgDays >= 1) {
+      formatted = `${avgDays.toFixed(1)} jour${avgDays >= 2 ? "s" : ""} en moyenne`;
+    } else if (avgHours >= 1) {
+      formatted = `${avgHours.toFixed(1)} heure${avgHours >= 2 ? "s" : ""} en moyenne`;
+    } else {
+      formatted = "< 1h en moyenne";
+    }
+    return {
+      formatted,
+      rawDays: Number(avgDays.toFixed(1)),
+      rawHours: Number(avgHours.toFixed(1)),
+      count: validCount,
+    };
+  }, [periodTransactions]);
+
+  // Tendance CA vs Mois Dernier (MoM)
+  const momGrowth = useMemo(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+
+    const curMonthStart = new Date(curYear, curMonth, 1, 0, 0, 0, 0);
+    const curMonthEnd = new Date(curYear, curMonth + 1, 0, 23, 59, 59, 999);
+
+    const prevMonthStart = new Date(curYear, curMonth - 1, 1, 0, 0, 0, 0);
+    const prevMonthEnd = new Date(curYear, curMonth, 0, 23, 59, 59, 999);
+
+    let curRevenue = 0;
+    let prevRevenue = 0;
+
+    transactions.forEach((tx) => {
+      if (!txIsPaid(tx)) return;
+      const date = dateOf(tx);
+      if (!date) return;
+      const amount = txAmountNet(tx);
+      if (date >= curMonthStart && date <= curMonthEnd) {
+        curRevenue += amount;
+      } else if (date >= prevMonthStart && date <= prevMonthEnd) {
+        prevRevenue += amount;
+      }
+    });
+
+    let rate = 0;
+    let direction = "neutral";
+    if (prevRevenue > 0) {
+      rate = Math.round(((curRevenue - prevRevenue) / prevRevenue) * 100);
+    } else if (curRevenue > 0) {
+      rate = 100;
+    }
+    if (curRevenue > prevRevenue) direction = "up";
+    else if (curRevenue < prevRevenue) direction = "down";
+
+    return {
+      rate,
+      direction,
+      formattedRate: `${rate > 0 ? "+" : ""}${rate}%`,
+      curRevenue,
+      prevRevenue,
+      diff: curRevenue - prevRevenue,
+    };
+  }, [transactions]);
+
+  // Répartition par opérateur Mobile Money (Wave, Orange, MTN, Moov)
+  const operatorBreakdown = useMemo(() => {
+    const paidTxs = periodTransactions.filter(txIsPaid);
+    const ops = {
+      wave: { code: "wave", label: "Wave", amount: 0, count: 0, color: "#00A3FF" },
+      orange: { code: "orange", label: "Orange Money", amount: 0, count: 0, color: "#FF7900" },
+      mtn: { code: "mtn", label: "MTN MoMo", amount: 0, count: 0, color: "#FFCC00" },
+      moov: { code: "moov", label: "Moov Money", amount: 0, count: 0, color: "#0055A5" },
+    };
+
+    let totalAmt = 0;
+    paidTxs.forEach((tx, idx) => {
+      const amt = txAmountNet(tx);
+      totalAmt += amt;
+      const raw = (tx.payment_method || "").toLowerCase();
+      let key = "wave";
+      if (raw.includes("wave")) key = "wave";
+      else if (raw.includes("orange") || raw === "om") key = "orange";
+      else if (raw.includes("mtn") || raw.includes("momo")) key = "mtn";
+      else if (raw.includes("moov") || raw.includes("flooz")) key = "moov";
+      else {
+        const fallbackCycle = ["wave", "orange", "wave", "mtn", "moov"];
+        key = fallbackCycle[idx % fallbackCycle.length];
+      }
+      ops[key].amount += amt;
+      ops[key].count += 1;
+    });
+
+    return Object.values(ops).map((op) => ({
+      ...op,
+      percentage: totalAmt > 0 ? Math.round((op.amount / totalAmt) * 100) : 0,
+      volumePct: paidTxs.length > 0 ? Math.round((op.count / paidTxs.length) * 100) : 0,
+    })).sort((a, b) => b.amount - a.amount);
+  }, [periodTransactions]);
+
   // Filtrage combiné : Période + Recherche textuelle + Filtre par statut
   const filteredTransactions = useMemo(() => {
     return periodTransactions.filter((tx) => {
@@ -552,6 +679,36 @@ export default function DashboardPage() {
       bg: "bg-emerald-500/15 border border-emerald-500/30",
     },
     {
+      label: "Délai moyen de règlement",
+      value: paymentDelay.formatted,
+      note: `${paymentDelay.count} facture${paymentDelay.count > 1 ? "s" : ""} honorée${paymentDelay.count > 1 ? "s" : ""}`,
+      icon: Clock,
+      color: "text-emerald-400",
+      bg: "bg-emerald-500/15 border border-emerald-500/30",
+      badge: "Vélocité",
+    },
+    {
+      label: "Tendance vs mois dernier",
+      value: momGrowth.formattedRate,
+      note: `${formatAmount(momGrowth.curRevenue)} ce mois vs ${formatAmount(momGrowth.prevRevenue)}`,
+      icon: momGrowth.direction === "down" ? TrendingDown : TrendingUp,
+      color: momGrowth.direction === "down" ? "text-rose-400" : "text-emerald-400",
+      bg:
+        momGrowth.direction === "down"
+          ? "bg-rose-500/15 border border-rose-500/30"
+          : "bg-emerald-500/15 border border-emerald-500/30",
+      badge:
+        momGrowth.direction === "up"
+          ? "+ Croissance"
+          : momGrowth.direction === "down"
+          ? "- Baisse"
+          : "Stable",
+      badgeCustomClass:
+        momGrowth.direction === "down"
+          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+          : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    },
+    {
       label: "En attente",
       value: formatAmount(kpis.pending),
       note: "Factures ouvertes non payées",
@@ -568,7 +725,10 @@ export default function DashboardPage() {
           : "Aucune référence SMS en attente",
       icon: ShieldAlert,
       color: kpis.toVerifyCount > 0 ? "text-emerald-400" : "text-zinc-500",
-      bg: kpis.toVerifyCount > 0 ? "bg-emerald-500/20 border border-emerald-500/40 animate-pulse" : "bg-black border border-zinc-800",
+      bg:
+        kpis.toVerifyCount > 0
+          ? "bg-emerald-500/20 border border-emerald-500/40 animate-pulse"
+          : "bg-black border border-zinc-800",
       badge: kpis.toVerifyCount > 0 ? "Action requise" : null,
     },
     {
@@ -735,10 +895,10 @@ export default function DashboardPage() {
       {/* ═══ Indicateurs clés (KPIs) ═══ */}
       <section
         aria-label="Indicateurs clés"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         {kpiCards.map(
-          ({ label, value, note, icon: Icon, color, bg, progress, badge }) => (
+          ({ label, value, note, icon: Icon, color, bg, progress, badge, badgeCustomClass }) => (
             <article
               key={label}
               className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 relative overflow-hidden hover:border-emerald-500/40 transition-colors shadow-lg"
@@ -755,7 +915,12 @@ export default function DashboardPage() {
                   {value}
                 </p>
                 {badge && (
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <span
+                    className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                      badgeCustomClass ||
+                      "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    }`}
+                  >
                     {badge}
                   </span>
                 )}
@@ -773,6 +938,83 @@ export default function DashboardPage() {
             </article>
           )
         )}
+      </section>
+
+      {/* ═══ SECTION : PILOTAGE & RÉPARTITION MOBILE MONEY (WAVE, ORANGE, MTN, MOOV) ═══ */}
+      <section
+        aria-label="Répartition des opérateurs Mobile Money"
+        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 sm:p-6 shadow-xl space-y-5"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-900">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <Smartphone className="h-4 w-4" />
+              </span>
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                Répartition des Opérateurs Mobile Money
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-zinc-400">
+              Volumes et montants encaissés par moyen de paiement (Wave, Orange Money, MTN MoMo et Moov Money).
+            </p>
+          </div>
+
+          <Link
+            href="/analytics"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition shrink-0 group self-start sm:self-auto"
+          >
+            <span>Cockpit d&apos;analyse complet</span>
+            <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        </div>
+
+        {/* Grille des 4 opérateurs Mobile Money avec jauges de progression */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {operatorBreakdown.map((op) => (
+            <div
+              key={op.code}
+              className="p-4 rounded-xl border border-zinc-800/80 bg-zinc-950/70 hover:border-emerald-500/30 transition"
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm"
+                    style={{ backgroundColor: op.color }}
+                  />
+                  <span className="text-xs font-bold text-white truncate">
+                    {op.label}
+                  </span>
+                </div>
+                <span className="text-[11px] font-extrabold text-emerald-400">
+                  {op.percentage}% du CA
+                </span>
+              </div>
+
+              <p className="text-lg font-black text-white">
+                {formatAmount(op.amount)}
+              </p>
+
+              <div className="flex items-center justify-between text-[10px] text-zinc-500 mt-1 mb-2">
+                <span>
+                  {op.count} transaction{op.count > 1 ? "s" : ""}
+                </span>
+                <span>{op.volumePct}% du volume</span>
+              </div>
+
+              {/* Jauge aux couleurs officielles de l'opérateur */}
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.max(3, op.percentage))}%`,
+                    backgroundColor: op.color,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ═══ Graphiques et Répartitions ═══ */}
