@@ -269,6 +269,7 @@ export default function NewPaymentLinkPage() {
           amount_total: calculations.total,
           fee_bearer: feeBearer,
           business_type: businessType,
+          is_recurring: businessType === "abonnement_resto",
           expires_at: computedExpiresAt,
           is_single_use: isSingleUse,
           max_uses: computedMaxUses,
@@ -568,14 +569,18 @@ export default function NewPaymentLinkPage() {
                 <label className="text-xs font-bold text-zinc-200 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Type d'activité</span>
+                    <span>Type d'activité & modèle</span>
                   </span>
                   <span className="text-[10px] text-zinc-400 font-mono">
-                    {businessType === "restaurant" ? "Mode Restauration" : "Mode Prestations"}
+                    {businessType === "abonnement_resto"
+                      ? "Abonnement Mensuel B2B"
+                      : businessType === "restaurant"
+                      ? "Mode Restauration"
+                      : "Mode Prestations"}
                   </span>
                 </label>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {/* Bouton Freelance */}
                   <button
                     type="button"
@@ -608,7 +613,7 @@ export default function NewPaymentLinkPage() {
                     </div>
                   </button>
 
-                  {/* Bouton Restaurant */}
+                  {/* Bouton Restaurant Commande */}
                   <button
                     type="button"
                     onClick={() => setBusinessType("restaurant")}
@@ -634,6 +639,46 @@ export default function NewPaymentLinkPage() {
                         }`}
                       >
                         {businessType === "restaurant" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+                        )}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Bouton Abonnement Restaurant B2B */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusinessType("abonnement_resto");
+                      if (!formData.service_name) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          service_name: "Abonnement Mensuel Business Pay - Restaurant",
+                        }));
+                      }
+                    }}
+                    className={`p-3 sm:p-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                      businessType === "abonnement_resto"
+                        ? "bg-purple-500/15 border-purple-500 text-white shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/30"
+                        : "bg-zinc-950 border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🔄</span>
+                        <div>
+                          <p className="text-xs font-bold text-white">Abo Resto</p>
+                          <p className="text-[10px] text-purple-300">Mensuel récurrent</p>
+                        </div>
+                      </div>
+                      <span
+                        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          businessType === "abonnement_resto"
+                            ? "border-purple-400 bg-purple-400"
+                            : "border-zinc-700"
+                        }`}
+                      >
+                        {businessType === "abonnement_resto" && (
                           <span className="h-1.5 w-1.5 rounded-full bg-black" />
                         )}
                       </span>

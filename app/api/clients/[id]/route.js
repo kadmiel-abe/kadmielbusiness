@@ -115,6 +115,7 @@ export async function GET(request, { params }) {
         name: client.name || client.nom || 'Client sans nom',
         phone: client.phone || client.telephone || '',
         email: client.email || '',
+        client_type: client.client_type || 'standard',
         status: computedStatus,
         notes: client.notes || '',
         created_at: client.created_at,

@@ -131,6 +131,7 @@ export async function GET(request) {
         name: c.name || c.nom || 'Client sans nom',
         phone: c.phone || c.telephone || '',
         email: c.email || '',
+        client_type: c.client_type || 'standard',
         status: computedStatus,
         notes: c.notes || '',
         created_at: c.created_at,

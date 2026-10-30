@@ -143,7 +143,20 @@ export async function POST(request) {
     const isSingleUse = is_single_use !== false;
     const computedMaxUses = isSingleUse ? 1 : Math.max(1, parseInt(max_uses, 10) || 1);
     const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
-    const computedBusinessType = business_type === 'restaurant' ? 'restaurant' : 'freelance';
+    const computedBusinessType = ['restaurant', 'abonnement_resto'].includes(business_type)
+      ? business_type
+      : 'freelance';
+    const isRecurring = Boolean(is_recurring || computedBusinessType === 'abonnement_resto');
+
+    // Si c'est un abonnement restaurant B2B, qualifier le client en 'entreprise_abo'
+    if (clientId && computedBusinessType === 'abonnement_resto') {
+      supabaseAdmin
+        .from('clients')
+        .update({ client_type: 'entreprise_abo' })
+        .eq('id', clientId)
+        .then(() => {})
+        .catch(() => {});
+    }
 
     // 5. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
     const fullPayload = {
@@ -155,6 +168,7 @@ export async function POST(request) {
       fee_amount: finalFeeAmount,
       status: 'en_attente',
       business_type: computedBusinessType,
+      is_recurring: isRecurring,
       expires_at: computedExpiresAt,
       is_single_use: isSingleUse,
       max_uses: computedMaxUses,

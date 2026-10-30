@@ -66,6 +66,7 @@ export async function GET() {
         paid_at: p.paid_at || null,
         fee_bearer: p.fee_bearer || 'client',
         business_type: p.business_type || 'freelance',
+        is_recurring: Boolean(p.is_recurring || p.business_type === 'abonnement_resto'),
         created_at: p.created_at,
         updated_at: p.updated_at,
         client: {
@@ -75,6 +76,7 @@ export async function GET() {
           phone: clientPhone,
           telephone: clientPhone,
           email: client.email || null,
+          client_type: client.client_type || 'standard',
         },
       };
     });

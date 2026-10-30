@@ -597,9 +597,15 @@ export default function ClientsDirectoryPage() {
                               {initials}
                             </span>
                             <div>
-                              <p className="font-bold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-1.5">
+                              <p className="font-bold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-1.5 flex-wrap">
                                 <span>{client.name}</span>
                                 {isVip && <Crown className="h-3.5 w-3.5 text-amber-400" />}
+                                {client.client_type === "entreprise_abo" && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded-md">
+                                    <span>🔄</span>
+                                    <span>Entreprise Abo</span>
+                                  </span>
+                                )}
                               </p>
                               <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400 font-mono">
                                 <span>{client.phone || "Téléphone manquant"}</span>
@@ -750,9 +756,15 @@ export default function ClientsDirectoryPage() {
                           {initials}
                         </span>
                         <div>
-                          <p className="font-bold text-white text-sm flex items-center gap-1.5">
+                          <p className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap">
                             <span>{client.name}</span>
                             {isVip && <Crown className="h-3.5 w-3.5 text-amber-400" />}
+                            {client.client_type === "entreprise_abo" && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded-md">
+                                <span>🔄</span>
+                                <span>Entreprise Abo</span>
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-zinc-400 font-mono mt-0.5">
                             {client.phone}

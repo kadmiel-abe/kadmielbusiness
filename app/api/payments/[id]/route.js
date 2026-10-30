@@ -148,6 +148,7 @@ export async function GET(request, { params }) {
           status: effectiveStatus,
           statut: effectiveStatus,
           business_type: payment.business_type || 'freelance',
+          is_recurring: Boolean(payment.is_recurring || payment.business_type === 'abonnement_resto'),
           fee_bearer: payment.fee_bearer || 'client',
           payment_method: payment.payment_method || null,
           manual_tx_id: payment.manual_tx_id || null,

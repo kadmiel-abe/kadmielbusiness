@@ -366,6 +366,8 @@ export default function PublicPaymentPage() {
     ? timesUsed >= 1 && !isPaid
     : timesUsed >= maxUses && !isPaid;
 
+  const isSubscription =
+    payment.business_type === "abonnement_resto" || Boolean(payment.is_recurring);
   const isRestaurant = payment.business_type === "restaurant";
 
   return (
@@ -706,12 +708,18 @@ export default function PublicPaymentPage() {
                 <div className="flex items-center gap-1.5">
                   <span
                     className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${
-                      isRestaurant
+                      isSubscription
+                        ? "bg-purple-500/10 text-purple-400 border-purple-500/25"
+                        : isRestaurant
                         ? "bg-amber-500/10 text-amber-500 border-amber-500/25"
                         : "bg-emerald-500/10 text-emerald-500 border-emerald-500/25"
                     }`}
                   >
-                    {isRestaurant ? "🍽️ Restaurant" : "💼 Freelance"}
+                    {isSubscription
+                      ? "🔄 Abonnement Restaurant B2B"
+                      : isRestaurant
+                      ? "🍽️ Restaurant"
+                      : "💼 Freelance"}
                   </span>
                   <span
                     className={`text-xs font-semibold ${

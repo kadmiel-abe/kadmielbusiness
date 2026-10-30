@@ -256,9 +256,14 @@ export default function DashboardPage() {
     });
   }, [transactions, periodPreset, customStartDate, customEndDate]);
 
-  // Filtrage par type d'activité ('all' | 'freelance' | 'restaurant')
+  // Filtrage par type d'activité ('all' | 'freelance' | 'restaurant' | 'abonnement_resto')
   const activityTransactions = useMemo(() => {
     if (activityFilter === "all") return periodTransactions;
+    if (activityFilter === "abonnement_resto") {
+      return periodTransactions.filter(
+        (tx) => tx.business_type === "abonnement_resto" || tx.is_recurring
+      );
+    }
     return periodTransactions.filter(
       (tx) => (tx.business_type || "freelance") === activityFilter
     );
@@ -268,14 +273,21 @@ export default function DashboardPage() {
   const activityCounts = useMemo(() => {
     let freelance = 0;
     let restaurant = 0;
+    let abonnement = 0;
     periodTransactions.forEach((tx) => {
-      if (tx.business_type === "restaurant") restaurant++;
-      else freelance++;
+      if (tx.business_type === "abonnement_resto" || tx.is_recurring) {
+        abonnement++;
+      } else if (tx.business_type === "restaurant") {
+        restaurant++;
+      } else {
+        freelance++;
+      }
     });
     return {
       all: periodTransactions.length,
       freelance,
       restaurant,
+      abonnement,
     };
   }, [periodTransactions]);
 
@@ -798,6 +810,8 @@ export default function DashboardPage() {
       label:
         activityFilter === "all"
           ? "Chiffre d'affaires global"
+          : activityFilter === "abonnement_resto"
+          ? "CA Abonnements Resto"
           : `CA ${activityFilter === "restaurant" ? "Restaurant" : "Freelance"}`,
       value: formatAmount(kpis.revenue),
       note:
@@ -810,6 +824,8 @@ export default function DashboardPage() {
       badge:
         activityFilter === "all"
           ? "Global"
+          : activityFilter === "abonnement_resto"
+          ? "🔄 Abonnements"
           : activityFilter === "restaurant"
           ? "🍽️ Restaurant"
           : "💼 Freelance",
@@ -939,12 +955,13 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Ligne 1bis : Bascule ergonomique par Activité ('Tous', 'Freelance', 'Restaurant') - Mobile First */}
+        {/* Ligne 1bis : Bascule ergonomique par Activité ('Tous', 'Freelance', 'Restaurant', 'Abonnements B2B') - Mobile First */}
         <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-lg w-full sm:w-fit overflow-x-auto no-scrollbar">
           {[
             { id: "all", label: "Toutes activités", icon: "🌐", count: activityCounts.all },
             { id: "freelance", label: "Freelance", icon: "💼", count: activityCounts.freelance },
             { id: "restaurant", label: "Restaurant", icon: "🍽️", count: activityCounts.restaurant },
+            { id: "abonnement_resto", label: "Abonnements B2B", icon: "🔄", count: activityCounts.abonnement },
           ].map(({ id, label, icon, count }) => {
             const active = activityFilter === id;
             return (
@@ -1527,7 +1544,12 @@ export default function DashboardPage() {
                         <td className="px-4 py-3.5 text-xs text-zinc-300">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-white">{service}</span>
-                            {tx.business_type === "restaurant" ? (
+                            {tx.business_type === "abonnement_resto" || tx.is_recurring ? (
+                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                                <span>🔄</span>
+                                <span>Abo Resto</span>
+                              </span>
+                            ) : tx.business_type === "restaurant" ? (
                               <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                                 <span>🍽️</span>
                                 <span>Restaurant</span>
@@ -1824,7 +1846,12 @@ export default function DashboardPage() {
                           <p className="text-xs font-semibold text-zinc-100 truncate">
                             {service}
                           </p>
-                          {tx.business_type === "restaurant" ? (
+                          {tx.business_type === "abonnement_resto" || tx.is_recurring ? (
+                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                              <span>🔄</span>
+                              <span>Abo Resto</span>
+                            </span>
+                          ) : tx.business_type === "restaurant" ? (
                             <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                               <span>🍽️</span>
                               <span>Restaurant</span>
