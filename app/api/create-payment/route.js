@@ -155,11 +155,23 @@ export async function POST(request) {
     const returnUrl = `${origin}/pay/${payment.id}`;
     const selectedProvider = normalizeProvider(provider);
 
-    // 7. Appel du module GeniusPay backend
+    const isRestoAbo = Boolean(
+      payment.business_type === 'restaurant' ||
+      payment.business_type === 'abonnement_resto' ||
+      payment.is_recurring ||
+      (payment.service_name && (
+        payment.service_name.toLowerCase().includes('resto') ||
+        payment.service_name.toLowerCase().includes('restaurant') ||
+        payment.service_name.toLowerCase().includes('abonnement')
+      ))
+    );
+    const effectiveBusinessType = payment.business_type || (isRestoAbo ? 'abonnement_resto' : 'freelance');
+
+    // 7. Appel du module GeniusPay backend (Redirection identique pour Freelance & Abonnement Restaurant)
     const geniusResult = await initiateGeniusPayment({
       paymentId: payment.id,
       amount: payment.amount_total,
-      description: payment.service_name || 'Paiement prestation',
+      description: payment.service_name || (effectiveBusinessType === 'abonnement_resto' ? 'Abonnement Restaurant' : 'Paiement prestation'),
       customer: {
         name: customerName,
         phone: customerPhone,
@@ -170,7 +182,8 @@ export async function POST(request) {
       successUrl: returnUrl,
       errorUrl: returnUrl,
       metadata: {
-        business_type: payment.business_type || 'freelance',
+        business_type: effectiveBusinessType,
+        is_recurring: isRestoAbo,
         net_amount: payment.amount_net,
         fee_amount: (payment.amount_total || 0) - (payment.amount_net || 0),
       },
