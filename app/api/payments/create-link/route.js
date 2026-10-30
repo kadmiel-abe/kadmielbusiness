@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getFeeSettings, calculatePaymentAmounts } from '@/lib/pricing';
+import { initiateGeniusPayment } from '@/lib/geniuspay';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -162,7 +163,42 @@ export async function POST(request) {
       }
     }
 
-    // 5. Insertion du paiement dans la table `payments` avec repli de résilience garanti
+    // 5. Initialisation immédiate de la session GeniusPay (Lien direct vers la page de paiement GeniusPay)
+    let geniusCheckoutUrl = null;
+    let geniusReference = null;
+    try {
+      const origin =
+        request.nextUrl?.origin ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        'https://kadmielbusiness.vercel.app';
+      const returnUrl = `${origin}/pay/${paymentId}`;
+
+      const geniusRes = await initiateGeniusPayment({
+        paymentId,
+        amount: finalAmountTotal,
+        description: cleanService || (computedBusinessType === 'abonnement_resto' ? 'Abonnement Restaurant' : 'Prestation Freelance'),
+        customer: {
+          name: cleanName,
+          phone: cleanPhone,
+          country: 'CI',
+        },
+        successUrl: returnUrl,
+        errorUrl: returnUrl,
+        metadata: {
+          business_type: computedBusinessType,
+          is_recurring: isRecurring,
+          net_amount: finalAmountNet,
+          fee_amount: finalFeeAmount,
+        },
+      });
+
+      geniusCheckoutUrl = geniusRes?.checkoutUrl || null;
+      geniusReference = geniusRes?.reference || null;
+    } catch (gpErr) {
+      console.warn('[CreateLink API] Génération directe GeniusPay réussira lors du clic :', gpErr.message);
+    }
+
+    // 6. Insertion du paiement dans la table `payments` avec repli de résilience garanti
     const fullPayload = {
       id: paymentId,
       client_id: clientId || null,
@@ -178,6 +214,7 @@ export async function POST(request) {
       max_uses: computedMaxUses,
       times_used: 0,
       fee_bearer: computedFeeBearer,
+      geniuspay_ref: geniusReference,
     };
 
     let { data: payment, error: payErr } = await supabaseAdmin
@@ -196,6 +233,7 @@ export async function POST(request) {
         amount_net: finalAmountNet,
         amount_total: finalAmountTotal,
         status: 'en_attente',
+        geniuspay_ref: geniusReference,
       };
       const retry = await supabaseAdmin
         .from('payments')
@@ -223,9 +261,14 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
+        checkout_url: geniusCheckoutUrl,
+        geniuspay_url: geniusCheckoutUrl,
         payment: {
           ...fullPayload,
           ...payment,
+          geniuspay_ref: geniusReference || payment?.geniuspay_ref || null,
+          checkout_url: geniusCheckoutUrl,
+          geniuspay_url: geniusCheckoutUrl,
           business_type: payment?.business_type || computedBusinessType,
           is_recurring: payment?.is_recurring !== undefined ? payment.is_recurring : isRecurring,
           fee_amount: payment?.fee_amount !== undefined ? payment.fee_amount : finalFeeAmount,

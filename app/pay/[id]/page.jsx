@@ -85,6 +85,7 @@ export default function PublicPaymentPage() {
   const [payingGenius, setPayingGenius] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [payError, setPayError] = useState(null);
+  const [autoRedirectAttempted, setAutoRedirectAttempted] = useState(false);
 
   // États pour l'envoi automatique du reçu
   const [receiptEmail, setReceiptEmail] = useState("");
@@ -186,7 +187,29 @@ export default function PublicPaymentPage() {
   useEffect(() => {
     if (!paymentToken) return;
 
-    fetchPayment();
+    fetchPayment().then((p) => {
+      // Redirection automatique immédiate vers la page GeniusPay lors de l'ouverture du lien
+      if (
+        p &&
+        (p.status === "en_attente" || p.statut === "en_attente") &&
+        !p.is_expired &&
+        !p.is_usage_exceeded
+      ) {
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const isCancelled =
+            params.get("genius_status") === "cancel" ||
+            params.get("cancel") === "true" ||
+            params.get("stay") === "true" ||
+            params.get("manual") === "true";
+
+          if (!isCancelled && !autoRedirectAttempted) {
+            setAutoRedirectAttempted(true);
+            handlePayGenius();
+          }
+        }
+      }
+    });
 
     // Polling toutes les 5 secondes si le paiement est en attente ou en vérification
     const interval = setInterval(async () => {
@@ -744,6 +767,19 @@ export default function PublicPaymentPage() {
                   </div>
                 )}
               </div>
+
+              {/* Bannière de redirection automatique GeniusPay */}
+              {payingGenius && (
+                <div className="rounded-2xl bg-emerald-500/15 border border-emerald-500/30 p-4 text-center space-y-2 animate-pulse">
+                  <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs">
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                    <span>Redirection vers la page de paiement GeniusPay en cours...</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-300">
+                    Connexion sécurisée à la passerelle officielle pour valider par Wave, Orange Money, MTN MoMo ou Moov Money.
+                  </p>
+                </div>
+              )}
 
               {/* Message d'erreur de la passerelle le cas échéant */}
               {payError && (

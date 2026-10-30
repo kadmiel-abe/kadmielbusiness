@@ -289,10 +289,15 @@ export default function NewPaymentLinkPage() {
           ? window.location.origin
           : "https://kadmielbusiness.vercel.app";
       const paymentUrl = `${origin}/pay/${paymentId}`;
+      const geniusCheckoutUrl = data.checkout_url || data.geniuspay_url || data.payment?.checkout_url || null;
+      // Priorité absolue au lien direct vers la page de paiement GeniusPay
+      const directPaymentUrl = geniusCheckoutUrl || paymentUrl;
 
       setCreatedPayment({
         id: paymentId,
-        url: paymentUrl,
+        url: directPaymentUrl,
+        portal_url: paymentUrl,
+        direct_genius_url: geniusCheckoutUrl,
         client_name: clientName,
         client_phone: normalizedPhone,
         service_name: serviceName,
@@ -493,15 +498,27 @@ export default function NewPaymentLinkPage() {
                 </button>
               </div>
 
-              {/* Bouton Partager sur WhatsApp */}
-              <button
-                type="button"
-                onClick={handleShareWhatsApp}
-                className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-              >
-                <Share2 className="w-4 h-4" />
-                <span>Envoyer sur WhatsApp à {createdPayment.client_name}</span>
-              </button>
+              {/* Boutons d'action : Partager WhatsApp & Ouvrir GeniusPay */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Envoyer sur WhatsApp</span>
+                </button>
+
+                <a
+                  href={createdPayment.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs sm:text-sm transition-all border border-white/10 flex items-center justify-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4 text-emerald-400" />
+                  <span>Ouvrir sur GeniusPay</span>
+                </a>
+              </div>
             </div>
 
             {/* Actions secondaires */}
