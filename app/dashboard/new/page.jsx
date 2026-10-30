@@ -85,10 +85,17 @@ export default function NewPaymentLinkPage() {
   const [createdPayment, setCreatedPayment] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  // Pré-remplissage automatique si redirigé depuis la fiche client CRM (?client_name=...&client_phone=...)
+  // Pré-remplissage automatique si redirigé depuis la fiche client CRM ou réglages par défaut
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      // 1. Charger la préférence de répartition des frais par défaut configurée dans les Réglages
+      const savedFeeBearer = localStorage.getItem("kadmiel_default_fee_bearer");
+      if (savedFeeBearer === "client" || savedFeeBearer === "freelance") {
+        setFeeBearer(savedFeeBearer);
+      }
+
+      // 2. Paramètres d'URL depuis la fiche client
       const params = new URLSearchParams(window.location.search);
       const name = params.get("client_name") || params.get("name");
       const phone = params.get("client_phone") || params.get("phone");
@@ -103,7 +110,7 @@ export default function NewPaymentLinkPage() {
         }));
       }
     } catch (e) {
-      console.warn("Erreur lecture query params :", e);
+      console.warn("Erreur lecture query params / réglages :", e);
     }
   }, []);
 

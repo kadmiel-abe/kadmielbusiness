@@ -10,11 +10,12 @@ export async function middleware(req) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // Si l'URL demandée commence par /dashboard ou /clients et qu'il n'y a pas de session,
+  // Si l'URL demandée commence par /dashboard, /clients ou /settings et qu'il n'y a pas de session,
   // rediriger immédiatement vers la page d'accueil (page de connexion)
   if (
     req.nextUrl.pathname.startsWith('/dashboard') ||
-    req.nextUrl.pathname.startsWith('/clients')
+    req.nextUrl.pathname.startsWith('/clients') ||
+    req.nextUrl.pathname.startsWith('/settings')
   ) {
     if (!session) {
       const redirectUrl = req.nextUrl.clone();
@@ -32,5 +33,7 @@ export const config = {
     '/dashboard/:path*',
     '/clients',
     '/clients/:path*',
+    '/settings',
+    '/settings/:path*',
   ],
 };

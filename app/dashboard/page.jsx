@@ -13,8 +13,6 @@ import {
   ReceiptText,
   RefreshCw,
   Search,
-  Server,
-  Settings2,
   ShieldAlert,
   ShieldCheck,
   Users,
@@ -1384,86 +1382,6 @@ export default function DashboardPage() {
             Aucun client avec un paiement encaissé pour cette période.
           </p>
         )}
-      </section>
-
-      {/* ═══ Réglages & Surveillance Système (#settings) ═══ */}
-      <section
-        id="settings"
-        className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-6 space-y-5 shadow-lg"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-emerald-400" />
-              Réglages & Statut du Système
-            </h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              Surveillance en direct des intégrations de paiement et de la base de
-              données.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => loadTransactions()}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-black text-xs font-semibold text-emerald-400 hover:text-black hover:bg-emerald-500 transition"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Actualiser les données
-          </button>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pt-2">
-          {/* Card 1 : Supabase */}
-          <div className="rounded-xl border border-emerald-500/20 bg-black p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
-                <Server className="h-3.5 w-3.5 text-emerald-400" />
-                Base Supabase
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Connecté
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500">
-              Table active : <code className="text-emerald-400">public.payments</code>{" "}
-              ({transactions.length} enregistrements synchronisés)
-            </p>
-          </div>
-
-          {/* Card 2 : Passerelle GeniusPay */}
-          <div className="rounded-xl border border-emerald-500/20 bg-black p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                Passerelle GeniusPay
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Opérationnel
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500">
-              Webhooks HMAC idempotents et transactions sécurisées activés.
-            </p>
-          </div>
-
-          {/* Card 3 : Session Administrateur */}
-          <div className="rounded-xl border border-emerald-500/20 bg-black p-4 space-y-2 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-2">
-                <Users className="h-3.5 w-3.5 text-emerald-400" />
-                Session Administrateur
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
-                Active
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500">
-              Accès complet aux modules Dashboard, Facturation et Clients.
-            </p>
-          </div>
-        </div>
       </section>
     </div>
   );

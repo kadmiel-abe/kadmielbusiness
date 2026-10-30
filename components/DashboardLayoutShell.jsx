@@ -27,7 +27,7 @@ const navigation = [
   { label: "Nouveau lien", href: "/dashboard/new", icon: PlusCircle },
   { label: "Transactions", href: "/dashboard#transactions", icon: ArrowLeftRight },
   { label: "Répertoire Clients", href: "/clients", icon: Users },
-  { label: "Réglages", href: "/dashboard#settings", icon: Settings2 },
+  { label: "Réglages", href: "/settings", icon: Settings2 },
 ];
 
 export default function DashboardLayoutShell({ children }) {
@@ -39,6 +39,47 @@ export default function DashboardLayoutShell({ children }) {
   const [signingOut, setSigningOut] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [adminUser, setAdminUser] = useState(null);
+
+  // Charger le profil de l'utilisateur administrateur
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.user) {
+          setAdminUser(session.user);
+        }
+      } catch (err) {
+        console.error("Erreur chargement profil admin layout:", err);
+      }
+    }
+    loadUser();
+
+    // Réagir aux mises à jour du profil depuis la page Réglages
+    const handleProfileUpdate = () => {
+      loadUser();
+    };
+    window.addEventListener("kadmiel:profile_updated", handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener("kadmiel:profile_updated", handleProfileUpdate);
+    };
+  }, [supabase]);
+
+  const adminName =
+    adminUser?.user_metadata?.full_name ||
+    adminUser?.user_metadata?.name ||
+    adminUser?.email?.split("@")[0] ||
+    "Administrateur";
+  const avatarUrl = adminUser?.user_metadata?.avatar_url || null;
+  const adminInitials = adminName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   // Fermer le drawer mobile lors du changement de route
   useEffect(() => {
@@ -74,6 +115,7 @@ export default function DashboardLayoutShell({ children }) {
     if (href === "/dashboard") return pathname === "/dashboard";
     if (href === "/clients") return pathname.startsWith("/clients");
     if (href === "/dashboard/new") return pathname === "/dashboard/new" || pathname === "/dashboard/nouveau";
+    if (href === "/settings") return pathname.startsWith("/settings");
     return pathname === href;
   };
 
@@ -184,10 +226,46 @@ export default function DashboardLayoutShell({ children }) {
             })}
           </nav>
 
-          {/* Pied de sidebar : Statut & Déconnexion */}
+          {/* Pied de sidebar : Profil Administrateur, Statut & Déconnexion */}
           <div className="p-3 border-t border-emerald-500/15 space-y-2 bg-black">
+            {/* Carte Profil Administrateur avec redirection vers /settings */}
+            <Link
+              href="/settings"
+              title="Gérer mon profil & mes réglages"
+              className={`group flex items-center gap-2.5 p-2 rounded-xl transition-all border ${
+                pathname.startsWith("/settings")
+                  ? "bg-emerald-500/15 border-emerald-500/50 text-white shadow-md shadow-emerald-500/10"
+                  : "bg-zinc-950/80 hover:bg-zinc-900 border-zinc-800/80 hover:border-emerald-500/30 text-zinc-300"
+              } ${isDesktopCollapsed ? "justify-center p-2" : ""}`}
+            >
+              <div className="relative h-9 w-9 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-950 border border-emerald-500/40 flex items-center justify-center font-black text-white text-xs shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={adminName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span>{adminInitials}</span>
+                )}
+                <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 border border-black ring-1 ring-emerald-500" />
+              </div>
+
+              {!isDesktopCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                    {adminName}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 truncate flex items-center gap-1">
+                    <span className="text-emerald-400 font-semibold">Admin</span> • Profil & Réglages
+                  </p>
+                </div>
+              )}
+            </Link>
+
             {!isDesktopCollapsed && (
-              <div className="px-3 py-2 rounded-xl bg-zinc-950 border border-emerald-500/20 flex items-center justify-between">
+              <div className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-emerald-500/20 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-zinc-400 flex items-center gap-1.5">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
                   Live GeniusPay
@@ -201,7 +279,7 @@ export default function DashboardLayoutShell({ children }) {
               onClick={handleSignOut}
               disabled={signingOut}
               title={isDesktopCollapsed ? "Se déconnecter" : undefined}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 border border-transparent hover:border-rose-500/20 disabled:cursor-wait disabled:opacity-50 ${
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 border border-transparent hover:border-rose-500/20 disabled:cursor-wait disabled:opacity-50 ${
                 isDesktopCollapsed ? "justify-center px-0" : ""
               }`}
             >
@@ -244,9 +322,30 @@ export default function DashboardLayoutShell({ children }) {
             </span>
           </Link>
 
-          {/* Actions header mobile : Cloche notifications + Déconnexion */}
+          {/* Actions header mobile : Cloche notifications + Bouton Profil/Réglages + Déconnexion */}
           <div className="flex items-center gap-2">
             <NotificationBell />
+            <Link
+              href="/settings"
+              aria-label="Réglages et profil administrateur"
+              title="Réglages et profil administrateur"
+              className={`h-10 w-10 rounded-xl border flex items-center justify-center transition-all active:scale-95 ${
+                pathname.startsWith("/settings")
+                  ? "bg-emerald-500 text-black border-emerald-400 shadow-md shadow-emerald-500/20"
+                  : "bg-zinc-950 border-emerald-500/20 text-zinc-300 hover:text-emerald-400 hover:bg-emerald-500/10"
+              }`}
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl}
+                  alt={adminName}
+                  className="h-6 w-6 rounded-lg object-cover"
+                />
+              ) : (
+                <Settings2 className="h-4 w-4" />
+              )}
+            </Link>
             <button
               type="button"
               onClick={handleSignOut}
@@ -340,6 +439,35 @@ export default function DashboardLayoutShell({ children }) {
 
               {/* Pied du Drawer */}
               <div className="pt-5 border-t border-emerald-500/20 space-y-3">
+                {/* Profil Administrateur Mobile */}
+                <Link
+                  href="/settings"
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                    pathname.startsWith("/settings")
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-white"
+                      : "bg-zinc-950 border-zinc-800 hover:border-emerald-500/30 text-zinc-300"
+                  }`}
+                >
+                  <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-950 border border-emerald-500/30 flex items-center justify-center font-bold text-white text-xs">
+                    {avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatarUrl}
+                        alt={adminName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span>{adminInitials}</span>
+                    )}
+                    <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-black" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-white truncate">{adminName}</p>
+                    <p className="text-[10px] text-emerald-400 truncate font-medium">Gérer profil & réglages</p>
+                  </div>
+                </Link>
+
                 <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/20 text-center">
                   <p className="text-[11px] font-semibold text-zinc-400">Mode Live Actif</p>
                   <p className="text-[10px] text-emerald-400 font-mono mt-0.5">
