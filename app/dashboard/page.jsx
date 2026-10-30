@@ -585,8 +585,8 @@ export default function DashboardPage() {
         <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-3">
           {/* Composant de Sélection de Période Avancé avec Raccourcis et Calendrier */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#0a0a0a] border border-emerald-500/25 shadow-lg overflow-x-auto no-scrollbar">
-              <span className="pl-2.5 pr-1 text-emerald-400 shrink-0">
+            <div className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-xl overflow-x-auto no-scrollbar">
+              <span className="text-emerald-400 shrink-0 mr-1.5 flex items-center">
                 <CalendarDays className="h-4 w-4" />
               </span>
 
@@ -603,7 +603,7 @@ export default function DashboardPage() {
                     key={id}
                     type="button"
                     onClick={() => setPeriodPreset(id)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 ${
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-150 shrink-0 ${
                       active
                         ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 border border-emerald-400"
                         : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
@@ -617,7 +617,7 @@ export default function DashboardPage() {
 
             {/* Champs Date début & Date fin affichés quand "Personnalisé" est sélectionné */}
             {periodPreset === "custom" && (
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-black border border-emerald-500/30 animate-slide-up text-xs flex-wrap">
+              <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 animate-slide-up text-xs flex-wrap shadow-lg">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-zinc-400">Du</span>
                   <input

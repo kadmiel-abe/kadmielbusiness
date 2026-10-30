@@ -400,7 +400,7 @@ export default function ClientsDirectoryPage() {
           </div>
 
           {/* Filtre de Période Avancé */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black border border-emerald-500/25 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black border border-emerald-500/30 overflow-x-auto no-scrollbar shadow-sm">
             {[
               { id: "all", label: "Tous" },
               { id: "month", label: "Ce mois" },
@@ -414,7 +414,7 @@ export default function ClientsDirectoryPage() {
                   key={id}
                   type="button"
                   onClick={() => setPeriodPreset(id)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
                     active
                       ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-900"
