@@ -46,29 +46,42 @@ export async function GET() {
       const clientName = client.name || client.nom || p.client_name || 'Client sans nom';
       const clientPhone = client.phone || client.telephone || p.client_phone || '';
 
-      return {
-        id: p.id,
-        service_name: p.service_name || p.service || 'Prestation',
-        service: p.service_name || p.service || 'Prestation',
-        amount_net: Number(p.amount_net ?? p.montant_net) || 0,
-        montant_net: Number(p.amount_net ?? p.montant_net) || 0,
-        amount_total: Number(p.amount_total ?? p.montant_total) || 0,
-        montant_total: Number(p.amount_total ?? p.montant_total) || 0,
-        status: p.status || p.statut || 'en_attente',
-        statut: p.status || p.statut || 'en_attente',
-        geniuspay_ref: p.geniuspay_ref || null,
-        manual_tx_id: p.manual_tx_id || null,
-        payment_method: p.payment_method || null,
-        expires_at: p.expires_at || null,
-        is_single_use: p.is_single_use !== false,
-        max_uses: Number(p.max_uses) || 1,
-        times_used: Number(p.times_used) || 0,
-        paid_at: p.paid_at || null,
-        fee_bearer: p.fee_bearer || 'client',
-        business_type: p.business_type || 'freelance',
-        is_recurring: Boolean(p.is_recurring || p.business_type === 'abonnement_resto'),
-        created_at: p.created_at,
-        updated_at: p.updated_at,
+        const isRestoAbo = Boolean(
+          p.business_type === 'restaurant' ||
+          p.business_type === 'abonnement_resto' ||
+          p.is_recurring ||
+          (p.service_name && (
+            p.service_name.toLowerCase().includes('resto') ||
+            p.service_name.toLowerCase().includes('restaurant') ||
+            p.service_name.toLowerCase().includes('abonnement')
+          ))
+        );
+        const effectiveBusinessType = p.business_type || (isRestoAbo ? 'abonnement_resto' : 'freelance');
+        const effectiveIsRecurring = Boolean(p.is_recurring || isRestoAbo);
+
+        return {
+          id: p.id,
+          service_name: p.service_name || p.service || 'Prestation',
+          service: p.service_name || p.service || 'Prestation',
+          amount_net: Number(p.amount_net ?? p.montant_net) || 0,
+          montant_net: Number(p.amount_net ?? p.montant_net) || 0,
+          amount_total: Number(p.amount_total ?? p.montant_total) || 0,
+          montant_total: Number(p.amount_total ?? p.montant_total) || 0,
+          status: p.status || p.statut || 'en_attente',
+          statut: p.status || p.statut || 'en_attente',
+          geniuspay_ref: p.geniuspay_ref || null,
+          manual_tx_id: p.manual_tx_id || null,
+          payment_method: p.payment_method || null,
+          expires_at: p.expires_at || null,
+          is_single_use: p.is_single_use !== false,
+          max_uses: Number(p.max_uses) || 1,
+          times_used: Number(p.times_used) || 0,
+          paid_at: p.paid_at || null,
+          fee_bearer: p.fee_bearer || 'client',
+          business_type: effectiveBusinessType,
+          is_recurring: effectiveIsRecurring,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
         client: {
           id: client.id || p.client_id || null,
           name: clientName,

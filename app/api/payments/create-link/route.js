@@ -51,6 +51,7 @@ export async function POST(request) {
       max_uses,
       fee_bearer,
       business_type,
+      is_recurring,
     } = body || {};
 
     // 2. Validation et assainissement stricts des entrées
@@ -87,11 +88,12 @@ export async function POST(request) {
     const cleanPhone = client_phone.trim().slice(0, 30);
     const cleanService = service_name.trim().slice(0, 150);
 
-    // Validation optionnelle de l'identifiant personnalisé
+    // Validation optionnelle de l'identifiant personnalisé (doit être un UUID valide pour PostgreSQL)
     let paymentId = crypto.randomUUID();
     if (id && typeof id === 'string') {
       const trimmedId = id.trim();
-      if (/^[a-zA-Z0-9_-]{1,64}$/.test(trimmedId)) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedId);
+      if (isUuid) {
         paymentId = trimmedId;
       }
     }
@@ -144,24 +146,26 @@ export async function POST(request) {
     const computedMaxUses = isSingleUse ? 1 : Math.max(1, parseInt(max_uses, 10) || 1);
     const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
     const computedBusinessType = ['restaurant', 'abonnement_resto'].includes(business_type)
-      ? business_type
+      ? 'abonnement_resto'
       : 'freelance';
     const isRecurring = Boolean(is_recurring || computedBusinessType === 'abonnement_resto');
 
     // Si c'est un abonnement restaurant B2B, qualifier le client en 'entreprise_abo'
     if (clientId && computedBusinessType === 'abonnement_resto') {
-      supabaseAdmin
-        .from('clients')
-        .update({ client_type: 'entreprise_abo' })
-        .eq('id', clientId)
-        .then(() => {})
-        .catch(() => {});
+      try {
+        await supabaseAdmin
+          .from('clients')
+          .update({ client_type: 'entreprise_abo' })
+          .eq('id', clientId);
+      } catch {
+        // Colonne optionnelle si migration non encore jouée
+      }
     }
 
-    // 5. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
+    // 5. Insertion du paiement dans la table `payments` avec repli de résilience garanti
     const fullPayload = {
       id: paymentId,
-      client_id: clientId,
+      client_id: clientId || null,
       service_name: cleanService,
       amount_net: finalAmountNet,
       amount_total: finalAmountTotal,
@@ -183,11 +187,11 @@ export async function POST(request) {
       .single();
 
     // Repli résilient si colonnes étendues non migrées
-    if (payErr && payErr.message && (payErr.message.includes('column') || payErr.message.includes('schema cache'))) {
-      console.warn('[CreateLink API] Repli résilient sur les colonnes de base :', payErr.message);
+    if (payErr) {
+      console.warn('[CreateLink API] Repli résilient sur les colonnes de base :', payErr.message || payErr);
       const basePayload = {
         id: paymentId,
-        client_id: clientId,
+        client_id: clientId || null,
         service_name: cleanService,
         amount_net: finalAmountNet,
         amount_total: finalAmountTotal,
@@ -198,8 +202,14 @@ export async function POST(request) {
         .insert(basePayload)
         .select('*, client:clients(*)')
         .single();
-      payment = retry.data;
-      payErr = retry.error;
+
+      if (!retry.error && retry.data) {
+        payment = retry.data;
+        payErr = null;
+      } else {
+        console.error('[CreateLink API] Erreur sur le repli de base :', retry.error);
+        payErr = retry.error;
+      }
     }
 
     if (payErr || !payment) {
@@ -213,7 +223,18 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
-        payment,
+        payment: {
+          ...fullPayload,
+          ...payment,
+          business_type: payment?.business_type || computedBusinessType,
+          is_recurring: payment?.is_recurring !== undefined ? payment.is_recurring : isRecurring,
+          fee_amount: payment?.fee_amount !== undefined ? payment.fee_amount : finalFeeAmount,
+          fee_bearer: payment?.fee_bearer || computedFeeBearer,
+          expires_at: payment?.expires_at || computedExpiresAt,
+          is_single_use: payment?.is_single_use !== undefined ? payment.is_single_use : isSingleUse,
+          max_uses: payment?.max_uses !== undefined ? payment.max_uses : computedMaxUses,
+          client: payment?.client || { id: clientId, name: cleanName, phone: cleanPhone },
+        },
       },
       { status: 201 }
     );

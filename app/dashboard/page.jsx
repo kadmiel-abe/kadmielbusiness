@@ -1533,22 +1533,17 @@ export default function DashboardPage() {
                           </div>
                         </td>
 
-                        {/* Service / Prestation / Plat */}
+                        {/* Service / Prestation / Abonnement */}
                         <td className="px-4 py-3.5 text-xs text-zinc-300">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-white">{service}</span>
-                            {tx.business_type === "abonnement_resto" || tx.is_recurring ? (
-                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                                <span>🔄</span>
+                            {tx.business_type === "abonnement_resto" || tx.business_type === "restaurant" || tx.is_recurring ? (
+                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                                <span>🍽️</span>
                                 <span>Abo Resto</span>
                               </span>
-                            ) : tx.business_type === "restaurant" ? (
-                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                <span>🍽️</span>
-                                <span>Restaurant</span>
-                              </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                                 <span>💼</span>
                                 <span>Freelance</span>
                               </span>
@@ -1839,18 +1834,13 @@ export default function DashboardPage() {
                           <p className="text-xs font-semibold text-zinc-100 truncate">
                             {service}
                           </p>
-                          {tx.business_type === "abonnement_resto" || tx.is_recurring ? (
-                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                              <span>🔄</span>
+                          {tx.business_type === "abonnement_resto" || tx.business_type === "restaurant" || tx.is_recurring ? (
+                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                              <span>🍽️</span>
                               <span>Abo Resto</span>
                             </span>
-                          ) : tx.business_type === "restaurant" ? (
-                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                              <span>🍽️</span>
-                              <span>Restaurant</span>
-                            </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                               <span>💼</span>
                               <span>Freelance</span>
                             </span>

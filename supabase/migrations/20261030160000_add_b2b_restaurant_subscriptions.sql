@@ -50,7 +50,16 @@ create index if not exists idx_payment_links_is_recurring
 -- Garantie d'alignement complet avec la table payments active de l'application
 alter table if exists public.payments
     add column if not exists business_type text default 'freelance',
-    add column if not exists is_recurring boolean default false;
+    add column if not exists is_recurring boolean default false,
+    add column if not exists fee_amount numeric default 0,
+    add column if not exists fee_bearer text default 'client',
+    add column if not exists expires_at timestamp with time zone,
+    add column if not exists is_single_use boolean default true,
+    add column if not exists max_uses integer default 1,
+    add column if not exists times_used integer default 0,
+    add column if not exists paid_at timestamp with time zone,
+    add column if not exists receipt_email text,
+    add column if not exists receipt_sent_at timestamp with time zone;
 
 alter table if exists public.payments
     drop constraint if exists payments_business_type_check;

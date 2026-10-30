@@ -43,7 +43,8 @@ export async function middleware(req) {
   if (
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/clients') ||
-    pathname.startsWith('/settings')
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/analytics')
   ) {
     if (!session) {
       const redirectUrl = req.nextUrl.clone();
@@ -63,6 +64,8 @@ export const config = {
     '/clients/:path*',
     '/settings',
     '/settings/:path*',
+    '/analytics',
+    '/analytics/:path*',
     '/api/analytics',
     '/api/analytics/:path*',
     '/api/clients',
