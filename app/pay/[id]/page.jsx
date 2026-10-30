@@ -579,8 +579,16 @@ export default function PublicPaymentPage() {
               <div className="space-y-3 pb-4 border-b border-slate-800/80">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <Receipt className="w-3.5 h-3.5 text-slate-400" />
-                    Prestation
+                    {payment.business_type === "restaurant" ? (
+                      <span className="text-sm">🍽️</span>
+                    ) : (
+                      <Receipt className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                    <span>
+                      {payment.business_type === "restaurant"
+                        ? "Plat / Commande"
+                        : "Prestation"}
+                    </span>
                   </span>
                   <span className="font-semibold text-slate-200">
                     {payment.service_name}
@@ -640,40 +648,84 @@ export default function PublicPaymentPage() {
                 </span>
               </div>
 
-              {/* Bouton de Paiement Principal (GeniusPay) */}
-              <button
-                onClick={handlePayGenius}
-                disabled={payingGenius}
-                className="w-full h-13 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] disabled:opacity-60 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-              >
-                {payingGenius ? (
-                  <>
-                    <div className="animate-spin h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full" />
-                    <span>Redirection sécurisée en cours...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 text-slate-950" />
-                    <span>Payer par Wave / Orange / MTN</span>
-                    <ArrowRight className="w-4 h-4 text-slate-950" />
-                  </>
-                )}
-              </button>
+              {/* ═══ BOUTONS DE PAIEMENT MOBILE MONEY (WAVE, ORANGE, MTN, MOOV) ═══ */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Régler avec votre compte Mobile Money :</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    Instantané
+                  </span>
+                </div>
 
-              {/* Badges des opérateurs acceptés */}
-              <div className="pt-1 flex items-center justify-center gap-2 text-[10px] text-slate-400 flex-wrap">
-                <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700/80 font-semibold text-slate-300">
-                  Wave
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700/80 font-semibold text-slate-300">
-                  Orange Money
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700/80 font-semibold text-slate-300">
-                  MTN MoMo
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700/80 font-semibold text-slate-300">
-                  Moov Money
-                </span>
+                {/* Grille tactile des 4 opérateurs ivoiriens */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    {
+                      id: "wave",
+                      name: "Wave",
+                      icon: "🌊",
+                      accent: "text-[#00A3FF]",
+                      border: "border-[#00A3FF]/30 hover:border-[#00A3FF] hover:bg-[#00A3FF]/10",
+                    },
+                    {
+                      id: "orange",
+                      name: "Orange Money",
+                      icon: "🍊",
+                      accent: "text-[#FF7900]",
+                      border: "border-[#FF7900]/30 hover:border-[#FF7900] hover:bg-[#FF7900]/10",
+                    },
+                    {
+                      id: "mtn",
+                      name: "MTN MoMo",
+                      icon: "🟡",
+                      accent: "text-[#FFCC00]",
+                      border: "border-[#FFCC00]/30 hover:border-[#FFCC00] hover:bg-[#FFCC00]/10",
+                    },
+                    {
+                      id: "moov",
+                      name: "Moov Money",
+                      icon: "🟣",
+                      accent: "text-[#0089cf]",
+                      border: "border-[#0089cf]/30 hover:border-[#0089cf] hover:bg-[#0089cf]/10",
+                    },
+                  ].map((op) => (
+                    <button
+                      key={op.id}
+                      type="button"
+                      onClick={handlePayGenius}
+                      disabled={payingGenius}
+                      className={`p-3 rounded-2xl border ${op.border} bg-slate-950/80 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:opacity-50 shadow-sm`}
+                    >
+                      <span className="text-xl">{op.icon}</span>
+                      <span className={`text-xs font-bold ${op.accent}`}>{op.name}</span>
+                      <span className="text-[9px] text-slate-500 font-medium">Côte d'Ivoire</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Bouton de confirmation principal */}
+                <button
+                  onClick={handlePayGenius}
+                  disabled={payingGenius}
+                  className="w-full h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] disabled:opacity-60 text-slate-950 font-black text-sm transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+                >
+                  {payingGenius ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full" />
+                      <span>Connexion sécurisée à la passerelle...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-slate-950" />
+                      <span>Payer {formatAmount(payment.amount_total)}</span>
+                      <ArrowRight className="w-4 h-4 text-slate-950" />
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* ═══ MODE DE SECOURS (Validation Manuelle) ═══ */}

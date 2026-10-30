@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { id, client_name, client_phone, service_name, amount_net, amount_total, expires_at, is_single_use, max_uses, fee_bearer } = body || {};
+    const { id, client_name, client_phone, service_name, amount_net, amount_total, expires_at, is_single_use, max_uses, fee_bearer, business_type } = body || {};
 
     if (!client_name || !client_phone || !service_name || !amount_net || !amount_total) {
       return NextResponse.json(
@@ -60,6 +60,7 @@ export async function POST(request) {
     const computedMaxUses = isSingleUse ? 1 : Math.max(1, parseInt(max_uses, 10) || 1);
     const computedExpiresAt = expires_at ? new Date(expires_at).toISOString() : null;
     const computedFeeBearer = fee_bearer === 'freelance' ? 'freelance' : 'client';
+    const computedBusinessType = business_type === 'restaurant' ? 'restaurant' : 'freelance';
 
     // 3. Insertion du paiement dans la table `payments` avec fallback automatique de résilience
     const paymentId = id || crypto.randomUUID();
@@ -70,6 +71,7 @@ export async function POST(request) {
       amount_net: Number(amount_net),
       amount_total: Number(amount_total),
       status: 'en_attente',
+      business_type: computedBusinessType,
       expires_at: computedExpiresAt,
       is_single_use: isSingleUse,
       max_uses: computedMaxUses,

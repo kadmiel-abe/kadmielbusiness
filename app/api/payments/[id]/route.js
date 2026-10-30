@@ -63,6 +63,7 @@ export async function GET(request, { params }) {
           amount_total: Number(payment.amount_total ?? payment.montant_total) || 0,
           status: effectiveStatus,
           statut: effectiveStatus,
+          business_type: payment.business_type || 'freelance',
           fee_bearer: payment.fee_bearer || 'client',
           payment_method: payment.payment_method || null,
           manual_tx_id: payment.manual_tx_id || null,

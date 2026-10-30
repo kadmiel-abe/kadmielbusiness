@@ -63,7 +63,12 @@ function normalizePhoneNumber(raw) {
 export default function NewPaymentLinkPage() {
   const router = useRouter();
 
-  // États du formulaire
+  // États du formulaire & sélection d'activité (Freelance / Restaurant)
+  const [businessType, setBusinessType] = useState("freelance"); // 'freelance' | 'restaurant'
+  const [clientMode, setClientMode] = useState("quick"); // 'quick' (ajout rapide) | 'select' (client existant)
+  const [clientsList, setClientsList] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+
   const [formData, setFormData] = useState({
     client_name: "",
     client_phone: "",
@@ -85,6 +90,22 @@ export default function NewPaymentLinkPage() {
   const [createdPayment, setCreatedPayment] = useState(null);
   const [copied, setCopied] = useState(false);
 
+  // Chargement des clients existants pour la sélection rapide
+  useEffect(() => {
+    async function loadClients() {
+      try {
+        const res = await fetch("/api/clients");
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.clients)) {
+          setClientsList(json.clients);
+        }
+      } catch (err) {
+        console.warn("Échec chargement liste clients :", err);
+      }
+    }
+    loadClients();
+  }, []);
+
   // Pré-remplissage automatique si redirigé depuis la fiche client CRM ou réglages par défaut
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -95,11 +116,16 @@ export default function NewPaymentLinkPage() {
         setFeeBearer(savedFeeBearer);
       }
 
-      // 2. Paramètres d'URL depuis la fiche client
+      // 2. Paramètres d'URL depuis la fiche client ou activité
       const params = new URLSearchParams(window.location.search);
       const name = params.get("client_name") || params.get("name");
       const phone = params.get("client_phone") || params.get("phone");
       const service = params.get("service_name") || params.get("service");
+      const activity = params.get("business_type") || params.get("type");
+
+      if (activity === "restaurant" || activity === "freelance") {
+        setBusinessType(activity);
+      }
 
       if (name || phone || service) {
         setFormData((prev) => ({
@@ -113,6 +139,19 @@ export default function NewPaymentLinkPage() {
       console.warn("Erreur lecture query params / réglages :", e);
     }
   }, []);
+
+  const handleSelectClient = (clientId) => {
+    setSelectedClientId(clientId);
+    if (!clientId) return;
+    const client = clientsList.find((c) => c.id === clientId);
+    if (client) {
+      setFormData((prev) => ({
+        ...prev,
+        client_name: client.name || client.nom || "",
+        client_phone: client.phone || client.telephone || "",
+      }));
+    }
+  };
 
   // Calcul dynamique de la date d'expiration
   const calculatedExpiresAt = useMemo(() => {
@@ -229,6 +268,7 @@ export default function NewPaymentLinkPage() {
           amount_net: calculations.net,
           amount_total: calculations.total,
           fee_bearer: feeBearer,
+          business_type: businessType,
           expires_at: computedExpiresAt,
           is_single_use: isSingleUse,
           max_uses: computedMaxUses,
@@ -255,6 +295,7 @@ export default function NewPaymentLinkPage() {
         client_name: clientName,
         client_phone: normalizedPhone,
         service_name: serviceName,
+        business_type: businessType,
         amount_net: calculations.net,
         amount_total: calculations.total,
         fee_bearer: feeBearer,
@@ -510,7 +551,7 @@ export default function NewPaymentLinkPage() {
             </div>
 
             {/* Formulaire */}
-            <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
               {/* Alerte Erreur */}
               {error && (
                 <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 flex items-start gap-3 text-xs text-rose-300 animate-slide-up">
@@ -522,60 +563,225 @@ export default function NewPaymentLinkPage() {
                 </div>
               )}
 
-              {/* Champ 1 : Nom du client */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Nom du client</span>
-                  <span className="text-rose-400">*</span>
+              {/* ═══ 1. CHOIX DU TYPE D'ACTIVITÉ (FREELANCE / RESTAURANT) ═══ */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-200 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Type d'activité</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {businessType === "restaurant" ? "Mode Restauration" : "Mode Prestations"}
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex : Jean-Marc Koffi ou Société Ivoire Tech"
-                  value={formData.client_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client_name: e.target.value })
-                  }
-                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium"
-                />
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Bouton Freelance */}
+                  <button
+                    type="button"
+                    onClick={() => setBusinessType("freelance")}
+                    className={`p-3 sm:p-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                      businessType === "freelance"
+                        ? "bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30"
+                        : "bg-zinc-950 border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">💼</span>
+                        <div>
+                          <p className="text-xs font-bold text-white">Freelance</p>
+                          <p className="text-[10px] text-zinc-400">Services & missions</p>
+                        </div>
+                      </div>
+                      <span
+                        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          businessType === "freelance"
+                            ? "border-emerald-400 bg-emerald-400"
+                            : "border-zinc-700"
+                        }`}
+                      >
+                        {businessType === "freelance" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+                        )}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Bouton Restaurant */}
+                  <button
+                    type="button"
+                    onClick={() => setBusinessType("restaurant")}
+                    className={`p-3 sm:p-3.5 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                      businessType === "restaurant"
+                        ? "bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
+                        : "bg-zinc-950 border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🍽️</span>
+                        <div>
+                          <p className="text-xs font-bold text-white">Restaurant</p>
+                          <p className="text-[10px] text-zinc-400">Plats & commandes</p>
+                        </div>
+                      </div>
+                      <span
+                        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          businessType === "restaurant"
+                            ? "border-amber-400 bg-amber-400"
+                            : "border-zinc-700"
+                        }`}
+                      >
+                        {businessType === "restaurant" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+                        )}
+                      </span>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              {/* Champ 2 : Numéro WhatsApp */}
-              <div className="space-y-1.5">
+              {/* ═══ 2. SÉLECTION DU CLIENT (OU AJOUT RAPIDE) ═══ */}
+              <div className="space-y-2.5 pt-2 border-t border-white/5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Numéro WhatsApp (Côte d'Ivoire)</span>
+                    <User className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Client destinataire</span>
                     <span className="text-rose-400">*</span>
                   </label>
-                  <span className="text-[10px] text-zinc-400 font-medium">
-                    Auto-format +225
-                  </span>
+
+                  {/* Bascule Sélection client vs Ajout rapide */}
+                  {clientsList.length > 0 && (
+                    <div className="inline-flex items-center gap-1 bg-zinc-900 border border-white/10 p-0.5 rounded-lg text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setClientMode("quick")}
+                        className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                          clientMode === "quick"
+                            ? "bg-emerald-500 text-black shadow-sm"
+                            : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Saisie rapide
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClientMode("select")}
+                        className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                          clientMode === "select"
+                            ? "bg-emerald-500 text-black shadow-sm"
+                            : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Choisir existant ({clientsList.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="tel"
-                  required
-                  placeholder="Ex : 07 08 09 10 11 ou +225..."
-                  value={formData.client_phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client_phone: e.target.value })
-                  }
-                  className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium font-mono"
-                />
+
+                {/* Si mode sélection dans la liste existante */}
+                {clientMode === "select" && clientsList.length > 0 ? (
+                  <div className="space-y-2">
+                    <select
+                      value={selectedClientId}
+                      onChange={(e) => handleSelectClient(e.target.value)}
+                      className="w-full h-11 px-3 text-xs sm:text-sm rounded-xl border border-emerald-500/40 bg-zinc-950 text-white outline-none focus:border-emerald-400"
+                    >
+                      <option value="">Sélectionnez un client du carnet...</option>
+                      {clientsList.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name || c.nom} ({c.phone || c.telephone || "Sans tél"})
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nom du client"
+                        value={formData.client_name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, client_name: e.target.value })
+                        }
+                        className="w-full h-10 px-3 text-xs rounded-xl border border-white/10 bg-zinc-900/80 text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500"
+                      />
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Numéro WhatsApp (+225...)"
+                        value={formData.client_phone}
+                        onChange={(e) =>
+                          setFormData({ ...formData, client_phone: e.target.value })
+                        }
+                        className="w-full h-10 px-3 text-xs rounded-xl border border-white/10 bg-zinc-900/80 text-white placeholder:text-zinc-500 outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Mode Ajout Rapide direct */
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <span className="text-[11px] text-zinc-400">Nom complet ou Entreprise</span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex : Jean-Marc Koffi ou Ivoire Tech"
+                          value={formData.client_name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, client_name: e.target.value })
+                          }
+                          className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[11px] text-zinc-400">WhatsApp (Côte d'Ivoire)</span>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Ex : 07 08 09 10 11"
+                          value={formData.client_phone}
+                          onChange={(e) =>
+                            setFormData({ ...formData, client_phone: e.target.value })
+                          }
+                          className="w-full h-11 px-3.5 text-xs sm:text-sm rounded-xl border border-white/10 bg-zinc-950 text-white placeholder:text-zinc-500 outline-none transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Champ 3 : Nom de la prestation */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Nom de la prestation</span>
-                  <span className="text-rose-400">*</span>
+              {/* ═══ 3. NOM DU SERVICE OU DU PLAT ═══ */}
+              <div className="space-y-1.5 pt-2 border-t border-white/5">
+                <label className="text-xs font-bold text-zinc-200 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    {businessType === "restaurant" ? (
+                      <span className="text-sm">🍽️</span>
+                    ) : (
+                      <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                    <span>
+                      {businessType === "restaurant"
+                        ? "Nom du plat ou de la commande"
+                        : "Nom de la prestation"}
+                    </span>
+                    <span className="text-rose-400">*</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-400">
+                    {businessType === "restaurant" ? "Addition / Menu" : "Facturation"}
+                  </span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex : Développement Site Web, Audit, Community Management..."
+                  placeholder={
+                    businessType === "restaurant"
+                      ? "Ex : Garba Thon Braisé, Menu Dégustation, Commande Table 4..."
+                      : "Ex : Développement Site Web, Audit, Community Management..."
+                  }
                   value={formData.service_name}
                   onChange={(e) =>
                     setFormData({ ...formData, service_name: e.target.value })

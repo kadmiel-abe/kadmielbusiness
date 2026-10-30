@@ -65,6 +65,7 @@ export async function GET() {
         times_used: Number(p.times_used) || 0,
         paid_at: p.paid_at || null,
         fee_bearer: p.fee_bearer || 'client',
+        business_type: p.business_type || 'freelance',
         created_at: p.created_at,
         updated_at: p.updated_at,
         client: {

@@ -141,12 +141,15 @@ export default function DashboardPage() {
   const [customStartDate, setCustomStartDate] = useState(""); // YYYY-MM-DD
   const [customEndDate, setCustomEndDate] = useState("");     // YYYY-MM-DD
 
-  // Nouveaux états : Recherche et Filtres
+  // Nouveaux états : Profil, Activité, Recherche et Filtres
+  const [profileName, setProfileName] = useState("Kadmiel ABE");
+  const [activityFilter, setActivityFilter] = useState("all"); // 'all' | 'freelance' | 'restaurant'
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'a_verifier' | 'en_attente' | 'paye' | 'echoue'
 
   const [kpis, setKpis] = useState({
     revenue: 0,
+    globalRevenue: 0,
     pending: 0,
     toVerifyCount: 0,
     toVerifyAmount: 0,
@@ -182,6 +185,22 @@ export default function DashboardPage() {
   useEffect(() => {
     loadTransactions();
   }, [loadTransactions]);
+
+  // Récupération du nom du profil administrateur
+  useEffect(() => {
+    async function fetchProfileName() {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
+        if (json?.success && json?.profile?.full_name) {
+          setProfileName(json.profile.full_name);
+        }
+      } catch (e) {
+        console.warn("Échec récupération profil :", e);
+      }
+    }
+    fetchProfileName();
+  }, []);
 
   // Actualisation temps réel instantanée sans rechargement de page
   useEffect(() => {
@@ -237,23 +256,51 @@ export default function DashboardPage() {
     });
   }, [transactions, periodPreset, customStartDate, customEndDate]);
 
-  // Calcul dynamique des KPIs
+  // Filtrage par type d'activité ('all' | 'freelance' | 'restaurant')
+  const activityTransactions = useMemo(() => {
+    if (activityFilter === "all") return periodTransactions;
+    return periodTransactions.filter(
+      (tx) => (tx.business_type || "freelance") === activityFilter
+    );
+  }, [periodTransactions, activityFilter]);
+
+  // Compteurs pour les badges de sélection d'activité
+  const activityCounts = useMemo(() => {
+    let freelance = 0;
+    let restaurant = 0;
+    periodTransactions.forEach((tx) => {
+      if (tx.business_type === "restaurant") restaurant++;
+      else freelance++;
+    });
+    return {
+      all: periodTransactions.length,
+      freelance,
+      restaurant,
+    };
+  }, [periodTransactions]);
+
+  // Calcul dynamique des KPIs (Global vs Filtré par Activité)
   useEffect(() => {
-    const paid = periodTransactions.filter(txIsPaid);
-    const pending = periodTransactions.filter(txIsPending);
-    const toVerify = periodTransactions.filter(txIsToVerify);
+    const paid = activityTransactions.filter(txIsPaid);
+    const pending = activityTransactions.filter(txIsPending);
+    const toVerify = activityTransactions.filter(txIsToVerify);
+
+    // CA Global sur toute la période (toutes activités confondues)
+    const globalPaid = periodTransactions.filter(txIsPaid);
+    const globalRevenue = globalPaid.reduce((sum, tx) => sum + txAmountNet(tx), 0);
 
     setKpis({
       revenue: paid.reduce((sum, tx) => sum + txAmountNet(tx), 0),
+      globalRevenue,
       pending: pending.reduce((sum, tx) => sum + txAmountTotal(tx), 0),
       toVerifyCount: toVerify.length,
       toVerifyAmount: toVerify.reduce((sum, tx) => sum + txAmountTotal(tx), 0),
-      successRate: periodTransactions.length
-        ? Math.round((paid.length / periodTransactions.length) * 100)
+      successRate: activityTransactions.length
+        ? Math.round((paid.length / activityTransactions.length) * 100)
         : 0,
-      totalTransactions: periodTransactions.length,
+      totalTransactions: activityTransactions.length,
     });
-  }, [periodTransactions]);
+  }, [activityTransactions, periodTransactions]);
 
   // Données du graphique d'évolution du CA
   const revenueChartData = useMemo(() => {
@@ -457,9 +504,9 @@ export default function DashboardPage() {
     })).sort((a, b) => b.amount - a.amount);
   }, [periodTransactions]);
 
-  // Filtrage combiné : Période + Recherche textuelle + Filtre par statut
+  // Filtrage combiné : Période + Activité + Recherche textuelle + Filtre par statut
   const filteredTransactions = useMemo(() => {
-    return periodTransactions.filter((tx) => {
+    return activityTransactions.filter((tx) => {
       // 1. Filtre par statut
       if (statusFilter === "paye" && !txIsPaid(tx)) return false;
       if (statusFilter === "en_attente" && (!txIsPending(tx) || txIsExpired(tx))) return false;
@@ -492,7 +539,7 @@ export default function DashboardPage() {
 
       return true;
     });
-  }, [periodTransactions, statusFilter, searchQuery]);
+  }, [activityTransactions, statusFilter, searchQuery]);
 
   // Copier le lien de paiement
   const copyPaymentLink = async (id) => {
@@ -671,12 +718,24 @@ export default function DashboardPage() {
 
   const kpiCards = [
     {
-      label: "Net encaissé",
+      label:
+        activityFilter === "all"
+          ? "Chiffre d'affaires global"
+          : `CA ${activityFilter === "restaurant" ? "Restaurant" : "Freelance"}`,
       value: formatAmount(kpis.revenue),
-      note: "Montant net disponible",
+      note:
+        activityFilter === "all"
+          ? "Montant net disponible (Toutes activités)"
+          : `Global période : ${formatAmount(kpis.globalRevenue)}`,
       icon: Wallet,
       color: "text-emerald-400",
       bg: "bg-emerald-500/15 border border-emerald-500/30",
+      badge:
+        activityFilter === "all"
+          ? "Global"
+          : activityFilter === "restaurant"
+          ? "🍽️ Restaurant"
+          : "💼 Freelance",
     },
     {
       label: "Délai moyen de règlement",
@@ -758,23 +817,29 @@ export default function DashboardPage() {
       )}
 
       {/* En-tête */}
-      <header className="space-y-5">
+      <header className="space-y-4 sm:space-y-5">
         {/* Ligne 1 : Titre de l'application et Actions d'en-tête (Cloche + Nouveau lien) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <p className="mb-1 text-xs capitalize text-zinc-500 font-medium">
-              {new Intl.DateTimeFormat("fr-FR", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              }).format(new Date())}
-            </p>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {profileName}
+              </span>
+              <p className="text-xs capitalize text-zinc-500 font-medium">
+                {new Intl.DateTimeFormat("fr-FR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                }).format(new Date())}
+              </p>
+            </div>
             <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
               Kadmiel Business Pay
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-zinc-400">
-              Centre de gestion de vos paiements mobiles Wave, Orange, MTN et Moov.
+              Centre de pilotage financier multi-activités et encaissement mobile money.
             </p>
           </div>
 
@@ -790,6 +855,41 @@ export default function DashboardPage() {
               <span>Nouveau lien</span>
             </Link>
           </div>
+        </div>
+
+        {/* Ligne 1bis : Bascule ergonomique par Activité ('Tous', 'Freelance', 'Restaurant') - Mobile First */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#0a0a0a] border border-emerald-500/30 shadow-lg w-full sm:w-fit overflow-x-auto no-scrollbar">
+          {[
+            { id: "all", label: "Toutes activités", icon: "🌐", count: activityCounts.all },
+            { id: "freelance", label: "Freelance", icon: "💼", count: activityCounts.freelance },
+            { id: "restaurant", label: "Restaurant", icon: "🍽️", count: activityCounts.restaurant },
+          ].map(({ id, label, icon, count }) => {
+            const active = activityFilter === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActivityFilter(id)}
+                className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap active:scale-95 ${
+                  active
+                    ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/25 border border-emerald-400"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent"
+                }`}
+              >
+                <span>{icon}</span>
+                <span>{label}</span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    active
+                      ? "bg-black/20 text-black font-extrabold"
+                      : "bg-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Ligne 2 : Sélecteur de Période Élargi & Déroulé (100% tactile et réactif) */}
@@ -1344,9 +1444,22 @@ export default function DashboardPage() {
                           </div>
                         </td>
 
-                        {/* Service */}
+                        {/* Service / Prestation / Plat */}
                         <td className="px-4 py-3.5 text-xs text-zinc-300">
-                          <span className="font-medium text-white">{service}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-white">{service}</span>
+                            {tx.business_type === "restaurant" ? (
+                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                <span>🍽️</span>
+                                <span>Restaurant</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                <span>💼</span>
+                                <span>Freelance</span>
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <span className="text-[10px] text-zinc-500">
                               Net : {formatAmount(net)}
@@ -1625,12 +1738,25 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* Ligne 2 : Service & Montant */}
+                    {/* Ligne 2 : Service & Montant avec Badge d'Activité */}
                     <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-900">
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-zinc-200 truncate">
-                          {service}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-semibold text-zinc-100 truncate">
+                            {service}
+                          </p>
+                          {tx.business_type === "restaurant" ? (
+                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              <span>🍽️</span>
+                              <span>Restaurant</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              <span>💼</span>
+                              <span>Freelance</span>
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-[10px] text-zinc-400">
                             Net : {formatAmount(net)}
