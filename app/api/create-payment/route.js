@@ -36,12 +36,28 @@ export async function POST(request) {
       );
     }
 
-    // 2. Récupération des informations du paiement et du client dans Supabase
-    const { data: payment, error: dbError } = await supabaseAdmin
+    // 2. Récupération des informations du paiement et du client dans Supabase (par id ou token)
+    let { data: payment, error: dbError } = await supabaseAdmin
       .from('payments')
       .select('*, client:clients(*)')
       .eq('id', paymentId)
-      .single();
+      .maybeSingle();
+
+    if (!payment) {
+      try {
+        const tokenRes = await supabaseAdmin
+          .from('payments')
+          .select('*, client:clients(*)')
+          .eq('token', paymentId)
+          .maybeSingle();
+        if (tokenRes.data) {
+          payment = tokenRes.data;
+          dbError = null;
+        }
+      } catch {
+        // Ignorer si pas de colonne token
+      }
+    }
 
     if (dbError || !payment) {
       console.error('[Create-Payment] Paiement introuvable dans Supabase :', dbError);
@@ -50,7 +66,7 @@ export async function POST(request) {
           error: 'Paiement introuvable.',
           details: dbError?.message || null,
         },
-        { status: dbError?.code === 'PGRST116' ? 404 : 500 }
+        { status: 404 }
       );
     }
 

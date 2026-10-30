@@ -69,12 +69,28 @@ export async function POST(request) {
       );
     }
 
-    // Récupération et vérification de la validité du paiement
-    const { data: payment, error: fetchError } = await supabaseAdmin
+    // Récupération et vérification de la validité du paiement (par id ou token)
+    let { data: payment, error: fetchError } = await supabaseAdmin
       .from('payments')
       .select('*')
       .eq('id', paymentId)
-      .single();
+      .maybeSingle();
+
+    if (!payment) {
+      try {
+        const tokenRes = await supabaseAdmin
+          .from('payments')
+          .select('*')
+          .eq('token', paymentId)
+          .maybeSingle();
+        if (tokenRes.data) {
+          payment = tokenRes.data;
+          fetchError = null;
+        }
+      } catch {
+        // Ignorer si pas de colonne token
+      }
+    }
 
     if (fetchError || !payment) {
       return NextResponse.json({ error: 'Paiement introuvable.' }, { status: 404 });

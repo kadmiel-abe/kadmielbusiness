@@ -12,12 +12,71 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'ID de paiement manquant.' }, { status: 400 });
     }
 
-    // Récupération résiliente du paiement avec la relation client (clé étrangère client_id -> clients)
-    const { data: payment, error } = await supabaseAdmin
-      .from('payments')
-      .select('*, client:clients(id, name, phone, email)')
-      .eq('id', id)
-      .maybeSingle();
+    // 1. Recherche par UUID (id) ou par token unique
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let payment = null;
+    let error = null;
+
+    if (isUuid) {
+      const res = await supabaseAdmin
+        .from('payments')
+        .select('*, client:clients(id, name, phone, email)')
+        .eq('id', id)
+        .maybeSingle();
+      payment = res.data;
+      error = res.error;
+    }
+
+    // Si non trouvé par ID ou si non-UUID, chercher par token dans payments
+    if (!payment) {
+      try {
+        const tokenRes = await supabaseAdmin
+          .from('payments')
+          .select('*, client:clients(id, name, phone, email)')
+          .eq('token', id)
+          .maybeSingle();
+        if (tokenRes.data) {
+          payment = tokenRes.data;
+          error = null;
+        }
+      } catch {
+        // Ignorer si colonne absente
+      }
+    }
+
+    // Repli de compatibilité dans la table payment_links
+    if (!payment) {
+      try {
+        const linkRes = await supabaseAdmin
+          .from('payment_links')
+          .select('*, client:clients(id, name, phone, email)')
+          .or(`token.eq.${id},id.eq.${isUuid ? id : '00000000-0000-0000-0000-000000000000'}`)
+          .maybeSingle();
+
+        if (linkRes.data) {
+          const l = linkRes.data;
+          payment = {
+            id: l.id,
+            token: l.token,
+            service_name: l.service_name,
+            amount_net: l.net_amount,
+            amount_total: l.total_amount,
+            fee_amount: l.fee_amount,
+            status: l.status,
+            business_type: l.business_type,
+            client: l.client,
+            client_id: l.client_id,
+            expires_at: l.expires_at,
+            created_at: l.created_at,
+            payment_method: l.payment_method,
+            geniuspay_ref: l.external_transaction_id,
+          };
+          error = null;
+        }
+      } catch {
+        // Table optionnelle
+      }
+    }
 
     if (error) {
       console.error('[API Payment ID GET] Erreur Supabase :', error);
