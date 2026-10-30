@@ -245,6 +245,9 @@ export default function DashboardLayoutShell({ children }) {
                     src={avatarUrl}
                     alt={adminName}
                     className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
                 ) : (
                   <span>{adminInitials}</span>
@@ -341,6 +344,9 @@ export default function DashboardLayoutShell({ children }) {
                   src={avatarUrl}
                   alt={adminName}
                   className="h-6 w-6 rounded-lg object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
                 />
               ) : (
                 <Settings2 className="h-4 w-4" />
@@ -456,6 +462,9 @@ export default function DashboardLayoutShell({ children }) {
                         src={avatarUrl}
                         alt={adminName}
                         className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
                       />
                     ) : (
                       <span>{adminInitials}</span>

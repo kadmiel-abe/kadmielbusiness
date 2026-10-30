@@ -174,35 +174,176 @@ export default function SettingsPage() {
     }
   }, [simulationAmount, profile.default_fee_bearer]);
 
-  // Gestion de l'upload de photo de profil (Data URL Base64)
-  const handleAvatarFileUpload = (e) => {
+  // État de chargement dédié à l'avatar
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Helper pour redimensionner et recadrer en carré parfait avant envoi
+  const resizeImageToSquare = (file, maxSize = 400, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          canvas.width = Math.min(maxSize, size);
+          canvas.height = canvas.width;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error("Contexte canvas non disponible"));
+            return;
+          }
+
+          // Recadrage centré carré
+          const startX = (img.width - size) / 2;
+          const startY = (img.height - size) / 2;
+
+          ctx.drawImage(
+            img,
+            startX,
+            startY,
+            size,
+            size,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          canvas.toBlob(
+            (blob) => {
+              URL.revokeObjectURL(objectUrl);
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error("Échec de la compression de l'image"));
+              }
+            },
+            "image/webp",
+            quality
+          );
+        } catch (err) {
+          URL.revokeObjectURL(objectUrl);
+          reject(err);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Impossible de lire le fichier image sélectionné."));
+      };
+
+      img.src = objectUrl;
+    });
+  };
+
+  // Gestion du téléversement immédiat de la photo de profil
+  const handleAvatarFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setProfileErrorMessage("Veuillez sélectionner un fichier image valide (JPG, PNG, WebP).");
+      setProfileErrorMessage("Veuillez sélectionner un fichier image valide (JPG, PNG, WebP, etc.).");
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileErrorMessage("L'image ne doit pas dépasser 2 Mo.");
-      return;
-    }
+    setUploadingAvatar(true);
+    setProfileErrorMessage("");
+    setProfileSuccessMessage("");
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result;
-      if (typeof result === "string") {
-        setProfile((prev) => ({ ...prev, avatar_url: result }));
-        setProfileErrorMessage("");
+    try {
+      // 1. Compression et recadrage automatique dans le navigateur
+      const compressedBlob = await resizeImageToSquare(file, 400, 0.85);
+
+      // 2. Envoi direct vers l'API de stockage Supabase
+      const formData = new FormData();
+      formData.append("file", compressedBlob, "avatar.webp");
+
+      const res = await fetch("/api/settings/avatar", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Échec de l'enregistrement de la photo.");
       }
-    };
-    reader.readAsDataURL(file);
+
+      // 3. Mise à jour de l'état local
+      setProfile((prev) => ({ ...prev, avatar_url: data.avatar_url }));
+      setProfileSuccessMessage("Votre photo de profil a été mise à jour avec succès !");
+
+      // 4. Notification en temps réel pour synchroniser la barre latérale et le menu mobile
+      window.dispatchEvent(new Event("kadmiel:profile_updated"));
+    } catch (err) {
+      console.error("Erreur téléversement avatar :", err);
+      setProfileErrorMessage(err.message || "Erreur lors du téléversement de la photo.");
+    } finally {
+      setUploadingAvatar(false);
+      // Réinitialiser le champ pour permettre de re-sélectionner le même fichier si besoin
+      e.target.value = "";
+    }
   };
 
-  // Suppression de la photo de profil
-  const handleRemoveAvatar = () => {
-    setProfile((prev) => ({ ...prev, avatar_url: "" }));
+  // Sélection rapide d'un avatar prédéfini
+  const handleSelectPresetAvatar = async (presetUrl) => {
+    if (uploadingAvatar || profile.avatar_url === presetUrl) return;
+
+    setUploadingAvatar(true);
+    setProfileErrorMessage("");
+    setProfileSuccessMessage("");
+
+    try {
+      const res = await fetch("/api/settings/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar_url: presetUrl }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Impossible d'appliquer cet avatar.");
+      }
+
+      setProfile((prev) => ({ ...prev, avatar_url: data.avatar_url }));
+      setProfileSuccessMessage("Avatar mis à jour avec succès !");
+      window.dispatchEvent(new Event("kadmiel:profile_updated"));
+    } catch (err) {
+      setProfileErrorMessage(err.message || "Erreur lors de la sélection de l'avatar.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // Suppression de la photo de profil (retour aux initiales)
+  const handleRemoveAvatar = async () => {
+    if (uploadingAvatar) return;
+
+    setUploadingAvatar(true);
+    setProfileErrorMessage("");
+    setProfileSuccessMessage("");
+
+    try {
+      const res = await fetch("/api/settings/avatar", {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Impossible de supprimer la photo.");
+      }
+
+      setProfile((prev) => ({ ...prev, avatar_url: "" }));
+      setProfileSuccessMessage("Photo de profil retirée. Vos initiales sont désormais affichées.");
+      window.dispatchEvent(new Event("kadmiel:profile_updated"));
+    } catch (err) {
+      setProfileErrorMessage(err.message || "Erreur lors de la suppression de la photo.");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   // Sauvegarde des informations du profil et entreprise
@@ -422,21 +563,43 @@ export default function SettingsPage() {
               {/* Photo de profil et gestion */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 p-4 rounded-xl bg-black border border-emerald-500/20">
                 <div className="relative group shrink-0">
-                  <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-800 to-black border-2 border-emerald-500/50 shadow-xl shadow-emerald-500/15 flex items-center justify-center text-2xl font-black text-white">
+                  <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-800 to-black border-2 border-emerald-500/50 shadow-xl shadow-emerald-500/15 flex items-center justify-center text-2xl font-black text-white relative">
                     {profile.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={profile.avatar_url}
                         alt={profile.full_name}
                         className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
                       />
                     ) : (
                       <span>{initials}</span>
                     )}
+
+                    {/* Overlay de chargement pendant le téléversement */}
+                    {uploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1.5 text-emerald-400 z-10 animate-fade-in">
+                        <RefreshCw className="h-6 w-6 animate-spin" />
+                        <span className="text-[10px] font-bold">Envoi...</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="absolute -bottom-1.5 -right-1.5 h-6 w-6 rounded-full bg-emerald-500 border-2 border-black flex items-center justify-center text-[10px] text-black font-bold shadow-md shadow-emerald-500/50">
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                  </span>
+
+                  <label
+                    title="Changer la photo de profil"
+                    className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-emerald-500 hover:bg-emerald-400 border-2 border-black flex items-center justify-center text-black cursor-pointer shadow-md shadow-emerald-500/50 transition-transform active:scale-90"
+                  >
+                    <Camera className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      onChange={handleAvatarFileUpload}
+                      disabled={uploadingAvatar}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 <div className="space-y-3 text-center sm:text-left flex-1 min-w-0">
@@ -451,13 +614,26 @@ export default function SettingsPage() {
 
                   {/* Actions Photo */}
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
-                    <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition-all cursor-pointer shadow-md shadow-emerald-500/20 active:scale-95">
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>Téléverser une photo</span>
+                    <label
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition-all cursor-pointer shadow-md shadow-emerald-500/20 active:scale-95 ${
+                        uploadingAvatar ? "opacity-50 pointer-events-none" : ""
+                      }`}
+                    >
+                      {uploadingAvatar ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      <span>
+                        {uploadingAvatar
+                          ? "Enregistrement..."
+                          : "Téléverser une photo"}
+                      </span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
                         onChange={handleAvatarFileUpload}
+                        disabled={uploadingAvatar}
                         className="hidden"
                       />
                     </label>
@@ -466,7 +642,8 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={handleRemoveAvatar}
-                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-rose-400 text-xs font-bold hover:bg-rose-500/10 hover:border-rose-500/30 transition-all active:scale-95"
+                        disabled={uploadingAvatar}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-rose-400 text-xs font-bold hover:bg-rose-500/10 hover:border-rose-500/30 transition-all active:scale-95 disabled:opacity-50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         <span>Retirer la photo</span>
@@ -484,9 +661,10 @@ export default function SettingsPage() {
                         <button
                           key={i}
                           type="button"
-                          onClick={() => setProfile((prev) => ({ ...prev, avatar_url: url }))}
+                          onClick={() => handleSelectPresetAvatar(url)}
+                          disabled={uploadingAvatar}
                           title="Choisir cet avatar"
-                          className={`h-9 w-9 rounded-xl overflow-hidden border-2 transition-transform hover:scale-110 ${
+                          className={`h-9 w-9 rounded-xl overflow-hidden border-2 transition-transform hover:scale-110 disabled:opacity-50 ${
                             profile.avatar_url === url
                               ? "border-emerald-400 ring-2 ring-emerald-500/40"
                               : "border-zinc-800 opacity-70 hover:opacity-100"
@@ -497,11 +675,29 @@ export default function SettingsPage() {
                             src={url}
                             alt={`Avatar ${i + 1}`}
                             className="h-full w-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         </button>
                       ))}
                     </div>
                   </div>
+
+                  {/* Feedback immédiat sous les actions photo */}
+                  {profileSuccessMessage && (
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in mt-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>{profileSuccessMessage}</span>
+                    </div>
+                  )}
+
+                  {profileErrorMessage && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2 animate-fade-in mt-2">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{profileErrorMessage}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
