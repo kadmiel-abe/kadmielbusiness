@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import {
@@ -184,6 +184,52 @@ export default function PublicPaymentPage() {
     }
   };
 
+  // 2. Initialisation de la session de paiement GeniusPay (Wave, Orange, MTN, Moov)
+  const handlePayGenius = useCallback(
+    async (operator = null, targetPaymentId = null) => {
+      const targetProvider = operator || selectedProvider;
+      if (operator) setSelectedProvider(operator);
+
+      setPayError(null);
+      setPayingGenius(true);
+
+      try {
+        const activeId = targetPaymentId || payment?.id || paymentToken;
+        const res = await fetch("/api/create-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentId: activeId,
+            provider: targetProvider || undefined,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(
+            data.details ||
+              data.error ||
+              "Échec de l'initialisation de la passerelle GeniusPay."
+          );
+        }
+
+        if (data.checkout_url) {
+          // Redirection directe vers la passerelle sécurisée
+          window.location.href = data.checkout_url;
+        } else {
+          throw new Error("L'URL de paiement fournie par la passerelle est vide.");
+        }
+      } catch (err) {
+        console.error("[PayPage] Erreur passerelle :", err);
+        setPayError(err.message || "Erreur de connexion à la passerelle.");
+      } finally {
+        setPayingGenius(false);
+      }
+    },
+    [selectedProvider, payment, paymentToken]
+  );
+
   useEffect(() => {
     if (!paymentToken) return;
 
@@ -205,7 +251,7 @@ export default function PublicPaymentPage() {
 
           if (!isCancelled && !autoRedirectAttempted) {
             setAutoRedirectAttempted(true);
-            handlePayGenius();
+            handlePayGenius(null, p.id);
           }
         }
       }
@@ -220,49 +266,7 @@ export default function PublicPaymentPage() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [paymentToken]);
-
-  // 2. Initialisation de la session de paiement GeniusPay (Wave, Orange, MTN, Moov)
-  const handlePayGenius = async (operator = null) => {
-    const targetProvider = operator || selectedProvider;
-    if (operator) setSelectedProvider(operator);
-
-    setPayError(null);
-    setPayingGenius(true);
-
-    try {
-      const res = await fetch("/api/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paymentId: payment?.id || paymentToken,
-          provider: targetProvider || undefined,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(
-          data.details ||
-            data.error ||
-            "Échec de l'initialisation de la passerelle GeniusPay."
-        );
-      }
-
-      if (data.checkout_url) {
-        // Redirection directe vers la passerelle sécurisée
-        window.location.href = data.checkout_url;
-      } else {
-        throw new Error("L'URL de paiement fournie par la passerelle est vide.");
-      }
-    } catch (err) {
-      console.error("[PayPage] Erreur passerelle :", err);
-      setPayError(err.message || "Erreur de connexion à la passerelle.");
-    } finally {
-      setPayingGenius(false);
-    }
-  };
+  }, [paymentToken, handlePayGenius, autoRedirectAttempted]);
 
   // 3. Soumission du mode de secours manuel (saisie de l'ID SMS)
   const handleManualSubmit = async (e) => {

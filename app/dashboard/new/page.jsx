@@ -26,6 +26,7 @@ import {
   Calendar,
   Layers,
   BadgePercent,
+  ExternalLink,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────
