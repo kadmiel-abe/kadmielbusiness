@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -84,6 +84,28 @@ export default function NewPaymentLinkPage() {
   // État de succès & données du lien créé
   const [createdPayment, setCreatedPayment] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // Pré-remplissage automatique si redirigé depuis la fiche client CRM (?client_name=...&client_phone=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const name = params.get("client_name") || params.get("name");
+      const phone = params.get("client_phone") || params.get("phone");
+      const service = params.get("service_name") || params.get("service");
+
+      if (name || phone || service) {
+        setFormData((prev) => ({
+          ...prev,
+          client_name: name ? decodeURIComponent(name) : prev.client_name,
+          client_phone: phone ? decodeURIComponent(phone) : prev.client_phone,
+          service_name: service ? decodeURIComponent(service) : prev.service_name,
+        }));
+      }
+    } catch (e) {
+      console.warn("Erreur lecture query params :", e);
+    }
+  }, []);
 
   // Calcul dynamique de la date d'expiration
   const calculatedExpiresAt = useMemo(() => {

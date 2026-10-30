@@ -1263,22 +1263,36 @@ export default function DashboardPage() {
         id="clients"
         className="rounded-2xl border border-emerald-500/20 bg-[#0a0a0a] p-5 shadow-lg"
       >
-        <div className="mb-6">
-          <h2 className="font-semibold text-white">Meilleurs Clients</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Par chiffre d&apos;affaires net encaissé
-          </p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-white">Meilleurs Clients</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Par chiffre d&apos;affaires net encaissé
+            </p>
+          </div>
+          <Link
+            href="/clients"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-black hover:bg-emerald-500/15 text-xs font-bold text-emerald-400 transition"
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Ouvrir le répertoire complet →</span>
+          </Link>
         </div>
         {topClients.length ? (
           <div className="grid gap-6 md:grid-cols-3">
             {topClients.map((client, index) => (
-              <div key={client.name}>
+              <Link
+                key={client.name}
+                href={`/clients?search=${encodeURIComponent(client.name)}`}
+                className="block p-3 -m-3 rounded-xl hover:bg-zinc-900/60 transition group cursor-pointer"
+                title={`Voir la fiche de ${client.name} dans le répertoire`}
+              >
                 <div className="mb-2.5 flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-black text-xs font-bold text-emerald-400">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-black text-xs font-bold text-emerald-400 group-hover:bg-emerald-500 group-hover:text-black transition">
                     {client.initials || "?"}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-200">
+                    <p className="truncate text-sm font-medium text-zinc-200 group-hover:text-white transition">
                       {client.name}
                     </p>
                     <p className="mt-0.5 text-xs text-emerald-400 font-bold">
@@ -1298,7 +1312,7 @@ export default function DashboardPage() {
                     }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (
